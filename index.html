@@ -37,9 +37,7 @@
   var ml=document.getElementById('pwa-manifest');if(ml)ml.href=url;
 })();
 </script>
-<!-- 🔥 Firebase SDK — uygulama kodundan ÖNCE yüklenmeli -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<!-- fonts -->
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Raleway:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -2008,287 +2006,49 @@ function switchAdminTab(name,btn){
   if(name==='raporlar')renderReports();
 }
 
-/* ══════════════════════════════════════════════
-   🔥 FİREBASE YAPILANDIRMASI
-   
-   Kurulumdan sonra aşağıdaki 7 satırı
-   kendi Firebase bilgilerinizle doldurun.
-   (KURULUM REHBERİ dosyasına bakın)
-══════════════════════════════════════════════ */
-var FB_CONFIG = {
-  apiKey:            "AIzaSyCbEd2J7mvv51N_dbNKOzrrGdHTu_ISJ84",
-  authDomain:        "ahmet-tekeli-berber.firebaseapp.com",
-  databaseURL:       "https://ahmet-tekeli-berber-default-rtdb.firebaseio.com",
-  projectId:         "ahmet-tekeli-berber",
-  storageBucket:     "ahmet-tekeli-berber.firebasestorage.app",
-  messagingSenderId: "89285289144",
-  appId:             "1:89285289144:web:ad1ad1b57f301d700d004d"
-};
-
-/* ── LocalStorage yardımcılar (oturum için hâlâ kullanılıyor) ── */
+/* ── LocalStorage ── */
 function lsSave(key,val){try{localStorage.setItem(key,JSON.stringify(val));}catch(e){}}
 function lsLoad(key){try{var v=localStorage.getItem(key);return v!==null?JSON.parse(v):null;}catch(e){return null;}}
 function lsRemove(key){try{localStorage.removeItem(key);}catch(e){}}
-
-/* ── Firebase değişkenleri ── */
-var DB = null;
-var FB_READY = false;
-var _fbUnsubAppts = null;
-var _fbUnsubCustomers = null;
-
-/* ── Yükleniyor overlay ── */
-function showLoadingOverlay(msg){
-  var el=document.getElementById('loading-overlay');
-  if(!el){
-    el=document.createElement('div');
-    el.id='loading-overlay';
-    el.style.cssText='position:fixed;inset:0;background:var(--bg);z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-family:Raleway,sans-serif;';
-    el.innerHTML='<div style="width:44px;height:44px;border-radius:50%;border:3px solid var(--border2);border-top-color:var(--gold);animation:spin .8s linear infinite;"></div>'
-      +'<div style="font-size:13px;font-weight:700;color:var(--grey);" id="loading-msg">'+msg+'</div>'
-      +'<style>@keyframes spin{to{transform:rotate(360deg)}}</style>';
-
-```
-document.body.appendChild(el);
-```
-
-} else {
-var lm=document.getElementById(‘loading-msg’);if(lm)lm.textContent=msg;
-el.style.display=‘flex’;
-}
-}
-function hideLoadingOverlay(){
-var el=document.getElementById(‘loading-overlay’);
-if(el)el.style.display=‘none’;
-}
-
-/* ── Firebase başlat ── */
-function initFirebase(){
-try{
-if(!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
-DB = firebase.database();
-FB_READY = true;
-showLoadingOverlay(‘Veriler yükleniyor…’);
-fbLoadAll();
-}catch(err){
-console.warn(‘Firebase hatası, yerel mod:’, err.message);
-lsLoadAll();
-appStart();
-}
-}
-
-/* ── Firebase: İlk yükleme ── */
-function fbLoadAll(){
-var loaded={appts:false,customers:false,config:false};
-var timer=setTimeout(function(){
-// 8 saniyede yüklenemezse yerel moda geç
-if(!loaded.appts||!loaded.customers||!loaded.config){
-console.warn(‘Firebase zaman aşımı, yerel mod’);
-hideLoadingOverlay();
-lsLoadAll();
-appStart();
-}
-},8000);
-
-function check(){
-if(loaded.appts&&loaded.customers&&loaded.config){
-clearTimeout(timer);
-hideLoadingOverlay();
-appStart();
-fbListenAppointments();
-fbListenCustomers();
-}
-}
-
-DB.ref(‘appointments’).once(‘value’).then(function(snap){
-var data=snap.val();
-if(data){
-S.appointments=Object.values(data);
-S.appointments.forEach(function(a){if(!a.remOpt)a.remOpt=‘none’;});
-}
-loaded.appts=true; check();
-}).catch(function(e){console.warn(‘appointments yüklenemedi:’,e);loaded.appts=true;check();});
-
-DB.ref(‘customers’).once(‘value’).then(function(snap){
-var data=snap.val();
-if(data) S.customers=Object.values(data);
-loaded.customers=true; check();
-}).catch(function(e){console.warn(‘customers yüklenemedi:’,e);loaded.customers=true;check();});
-
-DB.ref(‘config’).once(‘value’).then(function(snap){
-var data=snap.val();
-if(data){
-if(data.barbers  &&data.barbers.length)  S.barbers   =data.barbers;
-if(data.services &&data.services.length)  S.services  =data.services;
-if(data.workHours) S.workHours=data.workHours;
-if(data.holidays)  S.holidays =data.holidays;
-if(data.adminPhone)S.adminPhone=data.adminPhone;
-S.services.forEach(function(s){if(!s.cat)s.cat=‘Diğer’;});
-} else {
-// ── İLK AÇILIŞ: Firebase boş → varsayılan verileri yaz ──
-DB.ref(‘config’).set({
-barbers:   S.barbers,
-services:  S.services,
-workHours: S.workHours,
-holidays:  S.holidays,
-adminPhone:S.adminPhone||’’
-}).then(function(){
-console.log(‘Varsayılan config Firebase'e yazıldı’);
-});
-}
-loaded.config=true; check();
-}).catch(function(e){console.warn(‘config yüklenemedi:’,e);loaded.config=true;check();});
-}
-
-/* ── Gerçek zamanlı dinleyiciler ── */
-function fbListenAppointments(){
-_fbUnsubAppts=DB.ref(‘appointments’).on(‘value’,function(snap){
-var data=snap.val();
-S.appointments=data?Object.values(data):[];
-S.appointments.forEach(function(a){if(!a.remOpt)a.remOpt=‘none’;});
-cleanPastAppts();
-renderTimeGrid();
-if(document.getElementById(‘admin-panel-view’).style.display!==‘none’)renderAdminAll();
-if(S.loggedInUser)renderMusteriPanel();
-});
-}
-function fbListenCustomers(){
-_fbUnsubCustomers=DB.ref(‘customers’).on(‘value’,function(snap){
-var data=snap.val();
-if(data)S.customers=Object.values(data);
-});
-}
-
-/* ── Firebase yazma ── */
-function fbSaveAppointment(appt){
-if(!FB_READY||!DB)return;
-DB.ref(‘appointments/’+appt.id).set(appt).catch(function(e){console.warn(‘appt kayıt hatası:’,e);});
-}
-function fbDeleteAppointment(id){
-if(!FB_READY||!DB)return;
-DB.ref(‘appointments/’+id).remove().catch(function(e){console.warn(e);});
-}
-function fbSaveCustomer(cust){
-if(!FB_READY||!DB)return;
-DB.ref(‘customers/’+cust.id).set(cust).catch(function(e){console.warn(‘customer kayıt hatası:’,e);});
-}
-function fbDeleteCustomer(id){
-if(!FB_READY||!DB)return;
-DB.ref(‘customers/’+id).remove().catch(function(e){console.warn(e);});
-}
-function fbSaveConfig(){
-if(!FB_READY||!DB)return;
-DB.ref(‘config’).set({
-barbers:   S.barbers,
-services:  S.services,
-workHours: S.workHours,
-holidays:  S.holidays,
-adminPhone:S.adminPhone||’’
-}).catch(function(e){console.warn(‘config kayıt hatası:’,e);});
-}
-
-/* ── lsSaveAll: Firebase modunda atla ── */
 function lsSaveAll(){
-if(FB_READY&&DB)return;
-try{
-localStorage.setItem(‘at_customers’,JSON.stringify(S.customers));
-localStorage.setItem(‘at_appointments’,JSON.stringify(S.appointments));
-}catch(e){}
+  try{
+    localStorage.setItem('at_customers',   JSON.stringify(S.customers));
+    localStorage.setItem('at_appointments',JSON.stringify(S.appointments));
+    localStorage.setItem('at_barbers',     JSON.stringify(S.barbers));
+    localStorage.setItem('at_services',    JSON.stringify(S.services));
+    localStorage.setItem('at_workhours',   JSON.stringify(S.workHours));
+    localStorage.setItem('at_holidays',    JSON.stringify(S.holidays));
+  }catch(e){}
 }
 function lsLoadAll(){
-var c=lsLoad(‘at_customers’);if(c&&c.length)S.customers=c;
-var a=lsLoad(‘at_appointments’);if(a&&a.length)S.appointments=a;
-S.appointments.forEach(function(a){if(!a.remOpt)a.remOpt=‘none’;});
-S.services.forEach(function(s){if(!s.cat)s.cat=‘Diğer’;});
+  var c=lsLoad('at_customers');    if(c&&c.length)  S.customers =c;
+  var a=lsLoad('at_appointments'); if(a&&a.length)  S.appointments=a;
+  var b=lsLoad('at_barbers');      if(b&&b.length)  S.barbers   =b;
+  var sv=lsLoad('at_services');    if(sv&&sv.length) S.services  =sv;
+  var wh=lsLoad('at_workhours');   if(wh) S.workHours=wh;
+  var hl=lsLoad('at_holidays');    if(hl) S.holidays =hl;
+  S.appointments.forEach(function(a){if(!a.remOpt)a.remOpt='none';});
+  S.services.forEach(function(s){if(!s.cat)s.cat='Diğer';});
 }
 
 /* ── INIT ── */
-function appStart(){
+lsLoadAll();
 cleanPastAppts();
 initRandevuPanel();
-var uid=lsLoad(‘musteri_uid’);
-if(uid){var u=S.customers.find(function(c){return c.id===uid;});if(u){S.loggedInUser=u;fillRandevuForm();}}
-if(lsLoad(‘admin_session’)===‘1’){
-document.getElementById(‘admin-login-view’).style.display=‘none’;
-document.getElementById(‘admin-panel-view’).style.display=‘block’;
-renderAdminAll();
-}
+
+(function(){
+  var uid=lsLoad('musteri_uid');
+  if(uid){var u=S.customers.find(function(c){return c.id===uid;});if(u){S.loggedInUser=u;fillRandevuForm();}}
+})();
+(function(){
+  if(lsLoad('admin_session')==='1'){
+    document.getElementById('admin-login-view').style.display='none';
+    document.getElementById('admin-panel-view').style.display='block';
+    renderAdminAll();
+  }
+})();
+
 setInterval(function(){if(S.loggedInUser)checkReminders();},60000);
-}
-
-/* Firebase SDK head’de, DOM hazır olunca başlat */
-document.addEventListener(‘DOMContentLoaded’,function(){
-initFirebase();
-});
-
-/* ── Firebase patch: tüm yazma işlemlerini buluta bağla ── */
-var __submitRandevu=submitRandevu;
-submitRandevu=function(){__submitRandevu();var l=S.appointments[S.appointments.length-1];if(l)fbSaveAppointment(l);};
-
-var __confirmCancelAppt=confirmCancelAppt;
-confirmCancelAppt=function(id){__confirmCancelAppt(id);var a=S.appointments.find(function(x){return x.id===id;});if(a)fbSaveAppointment(a);};
-
-var __confirmChangeAppt=confirmChangeAppt;
-confirmChangeAppt=function(id){__confirmChangeAppt(id);var a=S.appointments.find(function(x){return x.id===id;});if(a)fbSaveAppointment(a);};
-
-var __confirmAdminEdit=confirmAdminEdit;
-confirmAdminEdit=function(id){__confirmAdminEdit(id);var a=S.appointments.find(function(x){return x.id===id;});if(a)fbSaveAppointment(a);};
-
-var __approveAppt=approveAppt;
-approveAppt=function(id){__approveAppt(id);var a=S.appointments.find(function(x){return x.id===id;});if(a)fbSaveAppointment(a);};
-
-var __confirmDeletePastOne=confirmDeletePastOne;
-confirmDeletePastOne=function(id){fbDeleteAppointment(id);__confirmDeletePastOne(id);};
-
-var __submitRating=submitRating;
-submitRating=function(){var rid=_rateId;__submitRating();var a=S.appointments.find(function(x){return x.id===rid;});if(a)fbSaveAppointment(a);};
-
-var __musteriKayit=musteriKayit;
-musteriKayit=function(){var pl=S.customers.length;__musteriKayit();if(S.customers.length>pl)fbSaveCustomer(S.customers[S.customers.length-1]);};
-
-var __confirmDelCust=confirmDelCust;
-confirmDelCust=function(uid){fbDeleteCustomer(uid);__confirmDelCust(uid);};
-
-var __toggleVip=toggleVip;
-toggleVip=function(uid){__toggleVip(uid);var c=S.customers.find(function(x){return x.id===uid;});if(c)fbSaveCustomer(c);};
-
-var __confirmMusteriSifre=confirmMusteriSifre;
-confirmMusteriSifre=function(){__confirmMusteriSifre();if(S.loggedInUser)fbSaveCustomer(S.loggedInUser);};
-
-var __sifreAdim2=sifreAdim2;
-sifreAdim2=function(){__sifreAdim2();if(_sifreUser)fbSaveCustomer(_sifreUser);};
-
-var __saveHours=saveHours;
-saveHours=function(){__saveHours();fbSaveConfig();};
-
-var __addHoliday=addHoliday;
-addHoliday=function(){__addHoliday();fbSaveConfig();};
-
-var __removeHoliday=removeHoliday;
-removeHoliday=function(d){__removeHoliday(d);fbSaveConfig();};
-
-var __addService=addService;
-addService=function(){__addService();fbSaveConfig();};
-
-var __confirmEditSvc=confirmEditSvc;
-confirmEditSvc=function(id){__confirmEditSvc(id);fbSaveConfig();};
-
-var __confirmDelSvc=confirmDelSvc;
-confirmDelSvc=function(id){__confirmDelSvc(id);fbSaveConfig();};
-
-var __addBarber=addBarber;
-addBarber=function(){__addBarber();fbSaveConfig();};
-
-var __confirmEditBarber=confirmEditBarber;
-confirmEditBarber=function(id){__confirmEditBarber(id);fbSaveConfig();};
-
-var __confirmDelBarber=confirmDelBarber;
-confirmDelBarber=function(id){__confirmDelBarber(id);fbSaveConfig();};
-
-var __saveBHours=saveBHours;
-saveBHours=function(id){__saveBHours(id);fbSaveConfig();};
-
-var __saveAdminPhone=saveAdminPhone;
-saveAdminPhone=function(){__saveAdminPhone();fbSaveConfig();};
 </script>
 
 </body>
