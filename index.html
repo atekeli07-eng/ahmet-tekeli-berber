@@ -2123,6 +2123,17 @@ if(data.workHours) S.workHours=data.workHours;
 if(data.holidays)  S.holidays =data.holidays;
 if(data.adminPhone)S.adminPhone=data.adminPhone;
 S.services.forEach(function(s){if(!s.cat)s.cat=‘Diğer’;});
+} else {
+// ── İLK AÇILIŞ: Firebase boş → varsayılan verileri yaz ──
+DB.ref(‘config’).set({
+barbers:   S.barbers,
+services:  S.services,
+workHours: S.workHours,
+holidays:  S.holidays,
+adminPhone:S.adminPhone||’’
+}).then(function(){
+console.log(‘Varsayılan config Firebase'e yazıldı’);
+});
 }
 loaded.config=true; check();
 }).catch(function(e){console.warn(‘config yüklenemedi:’,e);loaded.config=true;check();});
