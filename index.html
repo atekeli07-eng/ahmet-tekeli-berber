@@ -2067,8 +2067,20 @@ showLoader(‘Veriler yükleniyor…’);
 
 ```
 var got={a:false,c:false,cfg:false};
+var timedOut=false;
+
+// 6 saniye içinde yüklenemezse varsayılan veriyle başlat
+var timeout=setTimeout(function(){
+  timedOut=true;
+  console.warn('Firebase timeout - varsayılan veriyle başlatılıyor');
+  hideLoader();
+  bootApp();
+},6000);
+
 function done(){
+  if(timedOut) return;
   if(!got.a||!got.c||!got.cfg) return;
+  clearTimeout(timeout);
   hideLoader();
   bootApp();
   /* Gerçek zamanlı dinle */
@@ -2091,13 +2103,13 @@ DB.ref('appointments').once('value').then(function(snap){
   var d=snap.val();
   if(d){S.appointments=Object.values(d);S.appointments.forEach(function(a){if(!a.remOpt)a.remOpt='none';});}
   got.a=true; done();
-}).catch(function(){got.a=true;done();});
+}).catch(function(e){console.warn('appointments:',e);got.a=true;done();});
 
 DB.ref('customers').once('value').then(function(snap){
   var d=snap.val();
   if(d) S.customers=Object.values(d);
   got.c=true; done();
-}).catch(function(){got.c=true;done();});
+}).catch(function(e){console.warn('customers:',e);got.c=true;done();});
 
 DB.ref('config').once('value').then(function(snap){
   var d=snap.val();
@@ -2110,10 +2122,16 @@ DB.ref('config').once('value').then(function(snap){
     S.services.forEach(function(s){if(!s.cat)s.cat='Diğer';});
   } else {
     /* İlk açılış — varsayılan config'i Firebase'e yaz */
-    DB.ref('config').set({barbers:S.barbers,services:S.services,workHours:S.workHours,holidays:S.holidays,adminPhone:''});
+    DB.ref('config').set({
+      barbers:   S.barbers,
+      services:  S.services,
+      workHours: S.workHours,
+      holidays:  [],
+      adminPhone:''
+    }).catch(function(e){console.warn('config yazılamadı:',e);});
   }
   got.cfg=true; done();
-}).catch(function(){got.cfg=true;done();});
+}).catch(function(e){console.warn('config:',e);got.cfg=true;done();});
 ```
 
 }catch(err){
