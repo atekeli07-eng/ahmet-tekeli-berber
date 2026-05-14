@@ -30,7 +30,7 @@
   --gold:#B8922A;--gold-light:#D4A843;--gold-dark:#8B6914;
   --bg:#F7F3ED;--bg2:#EDE7DC;--bg3:#E3DBD0;--bg4:#D8CFC2;
   --surface:#FFFFFF;--surface2:#FAF7F3;--surface3:#F2EDE5;
-  --text:#1A1410;--text2:#3D3025;--grey:#8A7E6E;--grey2_old:#B5A998;
+  --text:#1A1410;--text2:#3D3025;--grey:#8A7E6E;--grey2:#B5A998;
   --border:#DDD5C8;--border2:#C8BFB0;
   --red:#C0392B;--green:#27855A;--blue:#2471A3;--orange:#C87422;--purple:#7D3C98;
 }
@@ -2125,8 +2125,26 @@ setInterval(function(){if(S.loggedInUser)checkReminders();},60000);
 }
 
 // DOM hazır olunca başlat
-// Tüm scriptler yüklendikten sonra başlat
-window.addEventListener(‘load’, startApp);
+// Firebase SDK hazır mı kontrol et, sonra başlat
+(function(){
+var attempts = 0;
+function tryStart(){
+attempts++;
+if(typeof firebase !== ‘undefined’ && firebase.app){
+startApp();
+} else if(attempts < 20){
+setTimeout(tryStart, 100); // 100ms’de bir dene, max 2 saniye
+} else {
+console.warn(‘Firebase SDK yüklenemedi, yerel modda başlatılıyor’);
+bootApp();
+}
+}
+if(document.readyState === ‘loading’){
+document.addEventListener(‘DOMContentLoaded’, tryStart);
+} else {
+tryStart();
+}
+})();
 
 // ── Veri yazma patch’leri ──
 var _sR=submitRandevu;
