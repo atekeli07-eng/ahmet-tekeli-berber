@@ -2122,27 +2122,8 @@ renderAdminAll();
 setInterval(function(){if(S.loggedInUser)checkReminders();},60000);
 }
 
-// DOM hazır olunca başlat
-// Firebase SDK hazır mı kontrol et, sonra başlat
-(function(){
-var attempts = 0;
-function tryStart(){
-attempts++;
-if(typeof firebase !== ‘undefined’ && typeof firebase.initializeApp === ‘function’){
-startApp();
-} else if(attempts < 40){
-setTimeout(tryStart, 100); // 100ms’de bir dene, max 4 saniye
-} else {
-console.warn(‘Firebase SDK yüklenemedi, yerel modda başlatılıyor’);
-bootApp();
-}
-}
-if(document.readyState === ‘loading’){
-document.addEventListener(‘DOMContentLoaded’, tryStart);
-} else {
-tryStart();
-}
-})();
+// Direkt başlat
+document.addEventListener(‘DOMContentLoaded’, initApp);
 
 // ── Veri yazma patch’leri ──
 var _sR=submitRandevu;
