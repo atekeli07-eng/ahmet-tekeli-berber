@@ -346,8 +346,6 @@ body{
 </style>
 </head>
 <!-- 🔥 Firebase SDK (jsDelivr - GitHub Pages uyumlu) -->
-<script src="https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-app-compat.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-database-compat.min.js"></script>
 <body>
 <div class="toast-container" id="toastContainer"></div>
 <div class="shell">
@@ -2196,11 +2194,33 @@ var _bH=saveBHours;       saveBHours=function(id){_bH(id);fbConfig();};
 var _wA=saveAdminPhone;   saveAdminPhone=function(){_wA();fbConfig();};
 
 /* ================================================
-FIREBASE
+FIREBASE REST API
+SDK gerektirmez — fetch() ile çalışır
+Her tarayıcıda, her hostingde çalışır
 ================================================ */
 
-var _DB = null;
+var FBURL=‘https://ahmet-tekeli-berber-default-rtdb.firebaseio.com’;
+var _pollTimer=null;
+var _lastApptCount=0;
 
+/* ── REST yardımcıları ── */
+function fbGET(path){
+return fetch(FBURL+path+’.json’,{cache:‘no-store’}).then(function(r){
+if(!r.ok) throw new Error(‘HTTP ‘+r.status);
+return r.json();
+});
+}
+function fbSET(path,data){
+return fetch(FBURL+path+’.json’,{
+method:‘PUT’,headers:{‘Content-Type’:‘application/json’},
+body:JSON.stringify(data)
+}).then(function(r){return r.json();}).catch(function(e){console.warn(‘fbSET:’,e);});
+}
+function fbDEL(path){
+return fetch(FBURL+path+’.json’,{method:‘DELETE’}).catch(function(e){console.warn(‘fbDEL:’,e);});
+}
+
+/* ── LocalStorage ── */
 function lsSave(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
 function lsLoad(k){try{var r=localStorage.getItem(k);return r!==null?JSON.parse(r):null;}catch(e){return null;}}
 function lsRemove(k){try{localStorage.removeItem(k);}catch(e){}}
@@ -2210,109 +2230,143 @@ S.appointments.forEach(function(a){if(!a.remOpt)a.remOpt=‘none’;});
 S.services.forEach(function(s){if(!s.cat)s.cat=‘Diger’;});
 }
 
+/* ── Yükleniyor ekranı ── */
 function showLoader(msg){
 var el=document.getElementById(‘fbl’);
 if(!el){
 el=document.createElement(‘div’);el.id=‘fbl’;
 el.style.cssText=‘position:fixed;inset:0;background:var(–bg);z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;’;
-el.innerHTML=’<div style="width:46px;height:46px;border-radius:50%;border:3px solid #ddd;border-top-color:var(--gold);animation:sp .8s linear infinite;"></div>’
-+’<div id="fbl-msg" style="font-size:14px;font-weight:700;color:var(--grey);">’+msg+’</div>’
+el.innerHTML=’<div style="width:46px;height:46px;border-radius:50%;border:3px solid var(--border);border-top-color:var(--gold);animation:sp .8s linear infinite;"></div>’
++’<div id="fbl-msg" style="font-family:Raleway,sans-serif;font-size:14px;font-weight:700;color:var(--grey);">’+msg+’</div>’
 +’<style>@keyframes sp{to{transform:rotate(360deg)}}</style>’;
 document.body.appendChild(el);
 }else{var m=document.getElementById(‘fbl-msg’);if(m)m.textContent=msg;el.style.display=‘flex’;}
 }
 function hideLoader(){var el=document.getElementById(‘fbl’);if(el)el.style.display=‘none’;}
 
+/* ── Polling: Admin açıkken yeni randevuları kontrol et ── */
+function startPolling(){
+if(_pollTimer) return;
+_pollTimer=setInterval(function(){
+var adminOpen=document.getElementById(‘admin-panel-view’)&&
+document.getElementById(‘admin-panel-view’).style.display!==‘none’;
+if(!adminOpen) return;
+
+```
+fbGET('/appointments').then(function(d){
+  var appts=d&&typeof d==='object'?Object.values(d):[];
+  var confirmed=appts.filter(function(a){
+    return a.status==='confirmed'||a.status==='pending';
+  });
+
+  // Yeni randevu geldi mi?
+  if(_lastApptCount>0 && confirmed.length > _lastApptCount){
+    var diff=confirmed.length-_lastApptCount;
+    // Yeni randevuları bul
+    var existing=S.appointments.map(function(a){return a.id;});
+    var newAppts=appts.filter(function(a){return existing.indexOf(a.id)===-1;});
+    newAppts.forEach(function(a){
+      var sv=S.services.find(function(s){return s.id===a.serviceId;})||{name:'?'};
+      var b=S.barbers.find(function(x){return x.id===a.barberId;})||{name:'?'};
+      addAdminNotif({icon:'📋',title:'Yeni Randevu: '+a.name,text:sv.name+' · '+a.date+' '+a.time+' · '+b.name});
+      toast('🔔 Yeni Randevu!',a.name+' · '+sv.name+' · '+a.time,'info',6000);
+    });
+  }
+  _lastApptCount=confirmed.length;
+
+  // Listeyi güncelle
+  S.appointments=appts;
+  S.appointments.forEach(function(a){if(!a.remOpt)a.remOpt='none';});
+  cleanPastAppts();
+  renderAdminAll();
+}).catch(function(){});
+```
+
+},15000); // Her 15 saniyede kontrol
+}
+
+/* ── Uygulama başlat ── */
 function initApp(){
 showLoader(‘Yükleniyor…’);
+var timedOut=false;
+var t=setTimeout(function(){
+timedOut=true; hideLoader(); boot();
+console.warn(‘Firebase timeout - yerel veriyle devam’);
+},8000);
 
-var FBCFG={
-apiKey:‘AIzaSyCbEd2J7mvv51N_dbNKOzrrGdHTu_ISJ84’,
-authDomain:‘ahmet-tekeli-berber.firebaseapp.com’,
-databaseURL:‘https://ahmet-tekeli-berber-default-rtdb.firebaseio.com’,
-projectId:‘ahmet-tekeli-berber’,
-storageBucket:‘ahmet-tekeli-berber.firebasestorage.app’,
-messagingSenderId:‘89285289144’,
-appId:‘1:89285289144:web:6a789603949882230d004d’
-};
+Promise.all([
+fbGET(’/appointments’),
+fbGET(’/customers’),
+fbGET(’/config’)
+]).then(function(res){
+if(timedOut) return;
+clearTimeout(t);
 
-try{
-if(!firebase.apps.length) firebase.initializeApp(FBCFG);
-_DB = firebase.database();
-}catch(e){
-console.warn(‘Firebase init hatasi:’,e);
-hideLoader(); boot(); return;
+```
+var appts=res[0]; var custs=res[1]; var cfg=res[2];
+
+if(appts&&typeof appts==='object'){
+  S.appointments=Object.values(appts);
+  S.appointments.forEach(function(a){if(!a.remOpt)a.remOpt='none';});
+  _lastApptCount=S.appointments.filter(function(a){return a.status==='confirmed'||a.status==='pending';}).length;
 }
-
-var ok={a:0,c:0,cfg:0};
-var done=false;
-var t=setTimeout(function(){if(!done){done=true;hideLoader();boot();}},8000);
-
-function check(){
-if(ok.a&&ok.c&&ok.cfg&&!done){
-done=true; clearTimeout(t); hideLoader(); boot();
-_DB.ref(‘appointments’).on(‘value’,function(s){
-var d=s.val();S.appointments=d?Object.values(d):[];
-S.appointments.forEach(function(a){if(!a.remOpt)a.remOpt=‘none’;});
-cleanPastAppts();renderTimeGrid();
-if(document.getElementById(‘admin-panel-view’).style.display!==‘none’)renderAdminAll();
-if(S.loggedInUser)renderMusteriPanel();
-});
-_DB.ref(‘customers’).on(‘value’,function(s){
-var d=s.val();if(d)S.customers=Object.values(d);
-});
-}
-}
-
-_DB.ref(‘appointments’).once(‘value’).then(function(s){
-var d=s.val();
-if(d){S.appointments=Object.values(d);S.appointments.forEach(function(a){if(!a.remOpt)a.remOpt=‘none’;});}
-ok.a=1;check();
-}).catch(function(e){console.warn(‘appt err:’,e);ok.a=1;check();});
-
-_DB.ref(‘customers’).once(‘value’).then(function(s){
-var d=s.val();if(d)S.customers=Object.values(d);
-ok.c=1;check();
-}).catch(function(e){console.warn(‘cust err:’,e);ok.c=1;check();});
-
-_DB.ref(‘config’).once(‘value’).then(function(s){
-var d=s.val();
-if(d){
-if(d.barbers&&d.barbers.length)S.barbers=d.barbers;
-if(d.services&&d.services.length)S.services=d.services;
-if(d.workHours)S.workHours=d.workHours;
-if(d.holidays)S.holidays=d.holidays;
-if(d.adminPhone)S.adminPhone=d.adminPhone;
-S.services.forEach(function(sv){if(!sv.cat)sv.cat=‘Diger’;});
+if(custs&&typeof custs==='object') S.customers=Object.values(custs);
+if(cfg&&typeof cfg==='object'){
+  if(cfg.barbers&&cfg.barbers.length)   S.barbers=cfg.barbers;
+  if(cfg.services&&cfg.services.length) S.services=cfg.services;
+  if(cfg.workHours) S.workHours=cfg.workHours;
+  if(cfg.holidays)  S.holidays=cfg.holidays;
+  if(cfg.adminPhone)S.adminPhone=cfg.adminPhone;
+  S.services.forEach(function(sv){if(!sv.cat)sv.cat='Diger';});
 }else{
-_DB.ref(‘config’).set({barbers:S.barbers,services:S.services,workHours:S.workHours,holidays:[],adminPhone:’’});
-}
-ok.cfg=1;check();
-}).catch(function(e){console.warn(‘cfg err:’,e);ok.cfg=1;check();});
+  fbSET('/config',{barbers:S.barbers,services:S.services,workHours:S.workHours,holidays:[],adminPhone:''});
 }
 
+hideLoader();
+boot();
+startPolling();
+```
+
+}).catch(function(e){
+if(timedOut) return;
+clearTimeout(t);
+console.warn(‘Veri yüklenemedi:’,e);
+hideLoader(); boot();
+});
+}
+
+/* ── Uygulama çekirdeği ── */
 function boot(){
-cleanPastAppts();
-initRandevuPanel();
+cleanPastAppts(); initRandevuPanel();
 var uid=lsLoad(‘musteri_uid’);
 if(uid){var u=S.customers.find(function(c){return c.id===uid;});if(u){S.loggedInUser=u;fillRandevuForm();}}
 if(lsLoad(‘admin_session’)===‘1’){
 document.getElementById(‘admin-login-view’).style.display=‘none’;
 document.getElementById(‘admin-panel-view’).style.display=‘block’;
 renderAdminAll();
+startPolling();
 }
 setInterval(function(){if(S.loggedInUser)checkReminders();},60000);
 }
 
-function db(){return _DB;}
-function fbA(a){if(db())db().ref(‘appointments/’+a.id).set(a);}
-function fbDA(id){if(db())db().ref(‘appointments/’+id).remove();}
-function fbC(c){if(db())db().ref(‘customers/’+c.id).set(c);}
-function fbDC(id){if(db())db().ref(‘customers/’+id).remove();}
-function fbCFG(){if(db())db().ref(‘config’).set({barbers:S.barbers,services:S.services,workHours:S.workHours,holidays:S.holidays,adminPhone:S.adminPhone||’’});}
+/* ── Firebase yazma ── */
+function fbA(a)  {fbSET(’/appointments/’+a.id,a);}
+function fbDA(id){fbDEL(’/appointments/’+id);}
+function fbC(c)  {fbSET(’/customers/’+c.id,c);}
+function fbDC(id){fbDEL(’/customers/’+id);}
+function fbCFG() {fbSET(’/config’,{barbers:S.barbers,services:S.services,workHours:S.workHours,holidays:S.holidays,adminPhone:S.adminPhone||’’});}
 
-// Patch
-var _sR=submitRandevu;submitRandevu=function(){_sR();var l=S.appointments[S.appointments.length-1];if(l)fbA(l);};
+/* ── Yazma patch’leri ── */
+var _sR=submitRandevu;
+submitRandevu=function(){
+_sR();
+var l=S.appointments[S.appointments.length-1];
+if(l){
+fbA(l);
+// Admin polling’i hemen tetikle
+_lastApptCount=Math.max(0,_lastApptCount);
+}
+};
 var _cCA=confirmCancelAppt;confirmCancelAppt=function(id){_cCA(id);var a=S.appointments.find(function(x){return x.id===id;});if(a)fbA(a);};
 var _cCh=confirmChangeAppt;confirmChangeAppt=function(id){_cCh(id);var a=S.appointments.find(function(x){return x.id===id;});if(a)fbA(a);};
 var _aE=confirmAdminEdit;confirmAdminEdit=function(id){_aE(id);var a=S.appointments.find(function(x){return x.id===id;});if(a)fbA(a);};
@@ -2336,12 +2390,8 @@ var _dB=confirmDelBarber;confirmDelBarber=function(id){_dB(id);fbCFG();};
 var _bH=saveBHours;saveBHours=function(id){_bH(id);fbCFG();};
 var _wA=saveAdminPhone;saveAdminPhone=function(){_wA();fbCFG();};
 
-// Başlat
-window.addEventListener(‘load’,function(){
-if(typeof firebase!==‘undefined’){initApp();}
-else{console.warn(‘Firebase SDK yok’);boot();}
-});
-
+/* ── Başlat ── */
+document.addEventListener(‘DOMContentLoaded’, initApp);
 </script>
 
 </body>
