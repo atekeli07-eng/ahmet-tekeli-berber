@@ -569,6 +569,9 @@ function subR(){
   rTG();rSvc();
   addAN({ic:'📋',tit:'Yeni Randevu: '+name,txt:sv2.name+' · '+fmtD(date)+' '+st+' · '+bn});
   toast('Randevu Alındı! ✂️',name+' · '+sv2.name+' · '+fmtD(date)+' '+st,'ok',4500);
+  // Firebase'e hemen yaz
+  var apptObj={};S.appts.forEach(function(a){apptObj[a.id]=a;});
+  fbSet('/appts',apptObj);
   if(S.user){rMP();chkRem();}
   rAll();
 }
@@ -700,7 +703,15 @@ function fbLoad(cb){
     fbGet('/config')
   ]).then(function(res){
     var ap=res[0];var cu=res[1];var cfg=res[2];
-    if(ap&&typeof ap==='object'){S.appts=Object.values(ap);S.appts.forEach(function(a){if(!a.ro)a.ro='none';});}
+    if(ap&&typeof ap==='object'){
+      S.appts=Object.values(ap);
+      S.appts.forEach(function(a){
+        if(!a.ro)a.ro='none';
+        // id tiplerini normalize et
+        if(a.bid)a.bid=parseInt(a.bid)||a.bid;
+        if(a.sid)a.sid=parseInt(a.sid)||a.sid;
+      });
+    }
     if(cu&&typeof cu==='object'){S.custs=Object.values(cu);}
     if(cfg&&typeof cfg==='object'){
       // Berberler - eski 'barbers' veya yeni format
@@ -725,17 +736,23 @@ function fbLoad(cb){
   });
 }
 
-// Admin için polling — 10sn'de yeni randevu kontrolü
+// Global polling — 3sn'de bir Firebase'den güncel randevuları çek
 function startPoll(){
   if(_poll)return;
   _poll=setInterval(function(){
-    var adminOpen=document.getElementById('APV')&&document.getElementById('APV').style.display!=='none';
-    if(!adminOpen)return;
     fbGet('/appts').then(function(d){
       if(!d||typeof d!=='object')return;
       var appts=Object.values(d);
+      appts.forEach(function(a){
+        if(!a.ro)a.ro='none';
+        if(a.bid)a.bid=parseInt(a.bid)||a.bid;
+        if(a.sid)a.sid=parseInt(a.sid)||a.sid;
+      });
+
+      // Yeni randevu var mı?
       var aktif=appts.filter(function(a){return a.st==='confirmed'||a.st==='pending';});
-      if(_lastAC>0&&aktif.length>_lastAC){
+      var adminOpen=document.getElementById('APV')&&document.getElementById('APV').style.display!=='none';
+      if(_lastAC>0&&aktif.length>_lastAC&&adminOpen){
         var mevcutIds=S.appts.map(function(a){return a.id;});
         var yeni=appts.filter(function(a){return mevcutIds.indexOf(a.id)===-1;});
         yeni.forEach(function(a){
@@ -746,10 +763,23 @@ function startPoll(){
         });
       }
       _lastAC=aktif.length;
-      S.appts=appts;S.appts.forEach(function(a){if(!a.ro)a.ro='none';});
-      clnPast();rAA();rASt();
+
+      // State güncelle
+      S.appts=appts;
+      clnPast();
+
+      // Admin açıksa listeyi güncelle
+      if(adminOpen){rAA();rASt();}
+
+      // Her zaman saat gridini güncelle — dolu saatler anında görünsün
+      rTG();
+
+      // Müşteri paneli açıksa onu da güncelle
+      var musteriOpen=document.getElementById('MLG')&&document.getElementById('MLG').style.display!=='none';
+      if(musteriOpen&&S.user)rMP();
+
     }).catch(function(){});
-  },10000);
+  },3000);
 }
 
 // save() fonksiyonunu override et — hem LS hem FB'ye yaz
@@ -767,10 +797,11 @@ initR();
 fbLoad(function(){
   clnPast();
   initR();
-  if(lsL('as')==='1'){rAll();startPoll();}
+  if(lsL('as')==='1'){rAll();}
   if(S.user)chkRem();
-  // Admin açıksa polling başlat
+  // Her zaman polling başlat — dolu saatler anında görünsün
   _lastAC=S.appts.filter(function(a){return a.st==='confirmed'||a.st==='pending';}).length;
+  startPoll();
 });
 
 setInterval(function(){if(S.user)chkRem();},60000);
