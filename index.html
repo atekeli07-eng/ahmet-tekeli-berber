@@ -588,9 +588,9 @@ var CATS={Saç:{bg:'rgba(26,95,138,.1)',bd:'rgba(26,95,138,.3)',c:'#1A5F8A'},Sak
 // State
 var S={
   barbers:[
-    {id:1,name:'Ahmet TEKELİ',role:'Baş Berber',ini:'AT',yuzde:100,cusHrs:{aktif:false,start:'09:00',end:'19:00',breaks:[]}},
-    {id:2,name:'Efe KARA',role:'Berber',ini:'EK',yuzde:30,cusHrs:{aktif:false,start:'09:00',end:'19:00',breaks:[]}},
-    {id:3,name:'Emre ŞORBA',role:'Berber',ini:'EŞ',yuzde:50,cusHrs:{aktif:false,start:'09:00',end:'19:00',breaks:[]}}
+    {id:1,name:'Ahmet TEKELİ',role:'Baş Berber',ini:'AT',yuzde:50,cusHrs:{aktif:false,start:'09:00',end:'19:00',breaks:[]}},
+    {id:2,name:'Efe KARA',role:'Berber',ini:'EK',yuzde:40,cusHrs:{aktif:false,start:'09:00',end:'19:00',breaks:[]}},
+    {id:3,name:'Emre ŞORBA',role:'Berber',ini:'EŞ',yuzde:40,cusHrs:{aktif:false,start:'09:00',end:'19:00',breaks:[]}}
   ],
   svcs:[{id:1,name:'Saç + Sakal',price:700,dur:60,cat:'Kombo'},{id:2,name:'Saç Kesimi',price:450,dur:30,cat:'Saç'},{id:3,name:'Sakal Düzeltme',price:300,dur:20,cat:'Sakal'},{id:4,name:'Saç+Sakal+Cilt',price:950,dur:90,cat:'Kombo'}],
   appts:[],custs:[],
@@ -846,7 +846,26 @@ function svBarSaat(bid){
 }
 function addBar(){var n=document.getElementById('NBN').value.trim();var r=document.getElementById('NBR').value.trim()||'Berber';if(!n){toast('Hata','Ad giriniz.','err');return;}var ini=n.split(' ').map(function(w){return w[0];}).join('').substring(0,2).toUpperCase();var nid=S.barbers.length?Math.max.apply(null,S.barbers.map(function(x){return x.id;}))+1:1;S.barbers.push({id:nid,name:n,role:r,ini:ini,yuzde:40,cusHrs:{aktif:false,start:'09:00',end:'19:00',breaks:[]}});document.getElementById('NBN').value='';document.getElementById('NBR').value='';save();rBars();rBL();rASt();rBCSR();toast('Eklendi',n,'ok');}
 function edBar(id){var b=S.barbers.find(function(x){return x.id===id;});if(!b)return;showM({tit:'Berber Düzenle',sub:b.name,body:'<div class="fld" style="margin-bottom:7px"><label>Ad</label><input type="text" id="ebn" value="'+b.name+'" style="'+IS()+'"></div><div class="fld" style="margin-bottom:7px"><label>Unvan</label><input type="text" id="ebr" value="'+b.role+'" style="'+IS()+'"></div><div class="fld"><label>Hakediş Yüzdesi (%)</label><input type="number" id="ebyuzde" value="'+(b.yuzde||40)+'" min="0" max="100" style="'+IS()+'"></div>',ctx:'Kaydet',oc:'cEdBar('+id+')',ct:'İptal'});}
-function cEdBar(id){var b=S.barbers.find(function(x){return x.id===id;});var n=document.getElementById('ebn').value.trim();var r=document.getElementById('ebr').value.trim();if(b&&n){b.name=n;b.role=r;b.ini=n.split(' ').map(function(w){return w[0];}).join('').substring(0,2).toUpperCase();save();}closeM();rBars();rBL();rBCSR();toast('Güncellendi',n,'ok');}
+function cEdBar(id){
+  var b=S.barbers.find(function(x){return x.id===id;});
+  var nEl=document.getElementById('ebn');
+  var rEl=document.getElementById('ebr');
+  var yzEl=document.getElementById('ebyuzde');
+  var n=nEl?nEl.value.trim():'';
+  var r=rEl?rEl.value.trim():'';
+  var yz=yzEl?Math.min(100,Math.max(0,parseInt(yzEl.value)||0)):( b?b.yuzde||40:40 );
+  if(b&&n){
+    b.name=n;
+    b.role=r;
+    b.yuzde=yz;
+    b.ini=n.split(' ').map(function(w){return w[0];}).join('').substring(0,2).toUpperCase();
+    save();
+  }
+  closeM();
+  rBars();rBL();rBCSR();
+  if(document.getElementById('HKL'))rHakedis();
+  toast('Güncellendi — '+n+' %'+yz,'','ok');
+}
 function delBar(id){var b=S.barbers.find(function(x){return x.id===id;});if(!b)return;showM({tit:'Sil',sub:b.name,body:'<div style="font-size:12px;color:var(--gr);">Silinecektir.</div>',ctx:'Sil',cc:'dan',oc:'cdBar('+id+')',ct:'İptal'});}
 function cdBar(id){S.barbers=S.barbers.filter(function(b){return b.id!==id;});if(S.selB===id&&S.barbers.length)S.selB=S.barbers[0].id;if(S.calB===id&&S.barbers.length)S.calB=S.barbers[0].id;save();closeM();rBars();rBL();rASt();rBCSR();toast('Silindi','','wrn');}
 // Müşteriler
