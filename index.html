@@ -1392,26 +1392,38 @@ function fbLoad(cb){
 
 // ── GERÇEK ZAMANLI DİNLEME (SSE) ──
 var _es={};  // EventSource bağlantıları
+var _sustur={};  // Hangi path'ler susturulacak
 
 function dinle(path, cb){
   if(_es[path]){try{_es[path].close();}catch(e){}}
   var url=FB+path+'.json?accept=text/event-stream';
   var es=new EventSource(url);
   es.addEventListener('put',function(e){
-    try{var d=JSON.parse(e.data);cb(d.data);}catch(err){}
+    if(_sustur[path])return;  // Susturulmuşsa yoksay
+    try{var d=JSON.parse(e.data);if(d.data!==undefined)cb(d.data);}catch(err){}
   });
   es.addEventListener('patch',function(e){
-    try{var d=JSON.parse(e.data);
-      // patch gelince tam veriyi çek
-      fbGet(path).then(function(full){cb(full);}).catch(function(){});
+    if(_sustur[path])return;
+    try{
+      fbGet(path).then(function(full){
+        if(!_sustur[path])cb(full);
+      }).catch(function(){});
     }catch(err){}
   });
   es.onerror=function(){
-    // SSE kesilirse 3sn sonra yeniden bağlan
     setTimeout(function(){dinle(path,cb);},3000);
   };
   _es[path]=es;
   return es;
+}
+
+// Belirli bir path'i geçici sustur (ms milisaniye)
+function sustur(path,ms){
+  _sustur[path]=true;
+  clearTimeout(_sustur[path+'_t']);
+  _sustur[path+'_t']=setTimeout(function(){
+    _sustur[path]=false;
+  },ms||2000);
 }
 
 function normalizeAppts(appts){
@@ -1509,7 +1521,13 @@ function startPoll(){
 var _origSave=save;
 save=function(){
   _origSave();
-  fbSave();  // Firebase'e yaz → SSE tüm cihazları tetikler
+  // Kendi değişikliğimizi SSE'nin üzerine yazmasını 3sn engelle
+  sustur('/appts',3000);
+  sustur('/config',3000);
+  sustur('/custs',3000);
+  sustur('/kasa',3000);
+  sustur('/stok',3000);
+  fbSave();
 };
 
 // INIT
