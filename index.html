@@ -689,7 +689,7 @@ function subR(){
   toast('Randevu Alındı! ✂️',name+' · '+sv2.name+' · '+fmtD(date)+' '+st,'ok',4500);
   // Firebase'e yaz — SSE diğer cihazları anında günceller
   var apptObj={};S.appts.forEach(function(a){apptObj[a.id]=a;});
-  fbSet('/appts',apptObj);
+  fbSet('/appts', S.appts.length ? apptObj : null);
   // Local UI anında güncelle
   rTG();rAll();
   if(S.user){rMP();chkRem();}
@@ -1325,13 +1325,17 @@ function fbDel(path){return fetch(FB+path+'.json',{method:'DELETE'}).catch(funct
 
 function fbSave(){
   var apptObj={};S.appts.forEach(function(a){apptObj[a.id]=a;});
-  fbSet('/appts',apptObj);
+  fbSet('/appts', S.appts.length ? apptObj : null);
   var custObj={};S.custs.forEach(function(c){custObj[c.id]=c;});
-  fbSet('/custs',custObj);
+  fbSet('/custs', S.custs.length ? custObj : null);
   // Config — barbers yuzde dahil her şey
   fbSet('/config',{barbers:S.barbers,svcs:S.svcs,wh:S.wh,hols:S.hols,waP:S.waP||''});
-  if(S.stok.length){var stkObj={};S.stok.forEach(function(s){stkObj[s.id]=s;});fbSet('/stok',stkObj);}
-  if(S.kasa.length){var ksObj={};S.kasa.forEach(function(k){ksObj[k.id]=k;});fbSet('/kasa',ksObj);}
+  // Stok — boş olsa bile yaz
+  var stkObj={};S.stok.forEach(function(s){stkObj[s.id]=s;});
+  fbSet('/stok', S.stok.length ? stkObj : null);
+  // Kasa — boş olsa bile yaz (silme işlemlerinin yansıması için)
+  var ksObj={};S.kasa.forEach(function(k){ksObj[k.id]=k;});
+  fbSet('/kasa', S.kasa.length ? ksObj : null);
 }
 
 function fbLoad(cb){
@@ -1357,6 +1361,7 @@ function fbLoad(cb){
     if(res[3]&&typeof res[3]==='object')S.stok=Object.values(res[3]);
     // Kasa
     if(res[4]&&typeof res[4]==='object')S.kasa=Object.values(res[4]);
+    else if(res[4]===null)S.kasa=[];
     if(cfg&&typeof cfg==='object'){
       // Berberler - eski 'barbers' veya yeni format
       var bars=cfg.barbers||cfg.b||[];
@@ -1492,13 +1497,21 @@ function pollFirebase(){
     // Kasa
     if(kasaData && typeof kasaData === 'object'){
       var newKasa = Object.values(kasaData);
-      if(newKasa.length !== S.kasa.length){ S.kasa = newKasa; changed = true; }
+      var kasaHash = JSON.stringify(newKasa.map(function(k){return k.id;}).sort());
+      var mevcutKasaHash = JSON.stringify(S.kasa.map(function(k){return k.id;}).sort());
+      if(kasaHash !== mevcutKasaHash){ S.kasa = newKasa; changed = true; }
+    } else if(kasaData === null && S.kasa.length > 0){
+      S.kasa = []; changed = true;
     }
 
     // Stok
     if(stokData && typeof stokData === 'object'){
       var newStok = Object.values(stokData);
-      if(newStok.length !== S.stok.length){ S.stok = newStok; changed = true; }
+      var stokHash = JSON.stringify(newStok.map(function(s){return s.id+s.miktar;}).sort());
+      var mevcutStokHash = JSON.stringify(S.stok.map(function(s){return s.id+s.miktar;}).sort());
+      if(stokHash !== mevcutStokHash){ S.stok = newStok; changed = true; }
+    } else if(stokData === null && S.stok.length > 0){
+      S.stok = []; changed = true;
     }
 
     if(changed){
