@@ -1051,12 +1051,6 @@ function prvHakedis(bid,yzVal){
 }
 
 // ── HAKEDİŞ HESABI ──
-function initHakedis(){
-  var hs=document.getElementById('HKS');var he=document.getElementById('HKE');
-  if(hs&&!hs.value){var w=new Date();w.setDate(1);hs.value=w.toISOString().split('T')[0];}
-  if(he&&!he.value)he.value=TODAY;
-}
-
 function rHakedis(){
   initHakedis();
   var rs=document.getElementById('HKS');var re=document.getElementById('HKE');
@@ -1248,7 +1242,10 @@ function initKasa(){
   var rs=document.getElementById('RPT_S');var re=document.getElementById('RPT_E');
   if(rs&&!rs.value){var w=new Date();w.setDate(w.getDate()-7);rs.value=w.toISOString().split('T')[0];}
   if(re&&!re.value)re.value=TODAY;
-  initHakedis();rHakedis();
+  var hs=document.getElementById('HKS');var he=document.getElementById('HKE');
+  if(hs&&!hs.value){var m=new Date();m.setDate(1);hs.value=m.toISOString().split('T')[0];}
+  if(he&&!he.value)he.value=TODAY;
+  rHakedis();
 }
 
 // PDF Rapor
@@ -1459,7 +1456,7 @@ function pollFirebase(){
 
     // Randevular değişti mi?
     var newApptHash = hashObj(apptData);
-    if(newApptHash !== _lastApptHash && _lastApptHash !== ''){
+    if(newApptHash !== _lastApptHash){
       if(apptData && typeof apptData === 'object'){
         var yeniAppts = Object.values(apptData);
         yeniAppts.forEach(function(a){
@@ -1489,7 +1486,7 @@ function pollFirebase(){
 
     // Config değişti mi?
     var newCfgHash = hashObj(cfgData);
-    if(newCfgHash !== _lastConfigHash && _lastConfigHash !== ''){
+    if(newCfgHash !== _lastConfigHash){
       if(cfgData && typeof cfgData === 'object'){
         if(cfgData.barbers&&cfgData.barbers.length){
           S.barbers = cfgData.barbers.map(function(b){
