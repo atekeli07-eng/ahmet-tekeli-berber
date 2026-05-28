@@ -378,6 +378,7 @@ body{font-family:'Raleway',sans-serif;font-weight:600;font-size:14px;background:
           <button class="tb2" onclick="swAT('musteriler',this)">Müşteriler</button>
           <button class="tb2" onclick="swAT('stok',this)">Stok</button>
           <button class="tb2" onclick="swAT('kasa',this)">Kasa</button>
+          <button class="tb2" onclick="swAT('calisanlar',this)">Çalışanlar</button>
         </div>
         <div id="at-randevular">
           <div class="crd" style="padding:12px;">
@@ -557,11 +558,28 @@ body{font-family:'Raleway',sans-serif;font-weight:600;font-size:14px;background:
               <button onclick="rptCSV()" style="flex:1;background:rgba(46,125,79,.1);border:1px solid rgba(46,125,79,.25);border-radius:9px;padding:11px;font-family:'Raleway',sans-serif;font-size:11px;font-weight:800;color:var(--green);cursor:pointer;">📥 CSV İndir</button>
             </div>
           </div>
+        </div>        <div id="at-calisanlar" style="display:none">
+          <div class="crd" style="padding:12px;">
+            <div class="shdr">
+              <div class="slbl" style="margin-bottom:0;">👔 Çalışan Performansı</div>
+              <input type="date" id="CAL_DATE" onchange="rCalisanlar()" style="background:var(--s2);border:1px solid var(--b);border-radius:7px;padding:5px 9px;color:var(--t);font-family:'Raleway',sans-serif;font-size:12px;font-weight:700;outline:none;">
+            </div>
+            <div class="gdv"></div>
+            <!-- Günlük özet -->
+            <div id="CAL_OZET" style="margin-bottom:11px;"></div>
+            <!-- Berber kartları -->
+            <div id="CAL_LISTE"></div>
+          </div>
         </div>
         <div id="at-musteriler" style="display:none">
           <div class="crd" style="padding:12px;">
             <div class="shdr"><div class="slbl" style="margin-bottom:0;">Müşteriler</div><span class="scnt" id="CST_C">–</span></div>
             <div class="gdv"></div>
+            <div style="display:flex;gap:6px;margin-bottom:9px;">
+              <button onclick="musteriCiktiCSV()" style="flex:1;background:rgba(46,125,79,.1);border:1px solid rgba(46,125,79,.25);border-radius:8px;padding:8px;font-family:'Raleway',sans-serif;font-size:10px;font-weight:800;color:var(--green);cursor:pointer;">📥 CSV İndir</button>
+              <button onclick="musteriCiktiTXT()" style="flex:1;background:rgba(26,95,138,.1);border:1px solid rgba(26,95,138,.25);border-radius:8px;padding:8px;font-family:'Raleway',sans-serif;font-size:10px;font-weight:800;color:var(--blu);cursor:pointer;">📋 TXT İndir</button>
+              <button onclick="musteriCiktiWA()" style="flex:1;background:rgba(46,125,79,.1);border:1px solid rgba(46,125,79,.25);border-radius:8px;padding:8px;font-family:'Raleway',sans-serif;font-size:10px;font-weight:800;color:var(--green);cursor:pointer;">💬 WA Listesi</button>
+            </div>
             <input class="srch" type="text" placeholder="🔍  İsim veya telefon ara..." oninput="rCsts(this.value)">
             <div id="CL"></div>
           </div>
@@ -647,7 +665,19 @@ function opSl(ds,bid){
 }
 function bsSl(bid,ds,ex){var bz={};S.appts.filter(function(a){return a.bid===bid&&a.date===ds&&a.st!=='cancelled'&&a.st!=='past'&&a.id!==ex;}).forEach(function(a){var sv=S.svcs.find(function(s){return s.id===a.sid;})||{dur:30};var sm=t2m(a.time),em=sm+sv.dur;SL.forEach(function(t){var tm=t2m(t);if(tm>=sm&&tm<em)bz[t]=true;});});return bz;}
 function hasCf(bid,ds,time,dur,ex){var sm=t2m(time),em=sm+dur;for(var i=0;i<S.appts.length;i++){var a=S.appts[i];if(a.bid!==bid||a.date!==ds||a.st==='cancelled'||a.st==='past'||a.id===ex)continue;var sv=S.svcs.find(function(s){return s.id===a.sid;})||{dur:30};var as=t2m(a.time),ae=as+sv.dur;if(sm<ae&&em>as)return a;}return null;}
-function clnPast(){S.appts.forEach(function(a){if(a.date<TODAY&&(a.st==='confirmed'||a.st==='pending'))a.st='past';});}
+function clnPast(){
+  // Geçmiş randevuları past yap
+  S.appts.forEach(function(a){
+    if(a.date<TODAY&&(a.st==='confirmed'||a.st==='pending'))a.st='past';
+  });
+  // 30 günden eski past/cancelled randevuları temizle (müşteri kaydı korunur)
+  var limit=new Date();limit.setDate(limit.getDate()-30);
+  var limitStr=limit.toISOString().split('T')[0];
+  S.appts=S.appts.filter(function(a){
+    if((a.st==='past'||a.st==='cancelled')&&a.date<limitStr)return false;
+    return true;
+  });
+}
 function fmtP(el){var v=el.value.replace(/\D/g,'');if(v.length>11)v=v.substring(0,11);var f='';if(v.length<=4)f=v;else if(v.length<=7)f=v.slice(0,4)+' '+v.slice(4);else if(v.length<=9)f=v.slice(0,4)+' '+v.slice(4,7)+' '+v.slice(7);else f=v.slice(0,4)+' '+v.slice(4,7)+' '+v.slice(7,9)+' '+v.slice(9);el.value=f;}
 // RANDEVU
 function initR(){rBL();rCF();rSvc();onSvc();var de=document.getElementById('RD');if(!de.value)de.value=TODAY;rTG();chkCB();filF();}
@@ -736,14 +766,14 @@ function aGrs(){if(document.getElementById('AUN').value==='admin'&&document.getE
 function aCks(){showM({tit:'Çıkış',sub:'',body:'<div style="font-size:12px;color:var(--gr);">Çıkış yapmak istiyor musunuz?</div>',ctx:'Çıkış',cc:'dan',oc:'cACks()',ct:'Vazgeç'});}
 function cACks(){lsR('as');closeM();document.getElementById('APV').style.display='none';document.getElementById('ALV').style.display='block';toast('Çıkış Yapıldı','','inf');}
 function aSD(){var c=document.getElementById('ACP').value;var n1=document.getElementById('ANP1').value;var n2=document.getElementById('ANP2').value;if(c!==APAS){toast('Hata','Mevcut şifre yanlış.','err');return;}if(!n1||n1.length<6){toast('Hata','En az 6 karakter.','err');return;}if(n1!==n2){toast('Hata','Şifreler uyuşmuyor.','err');return;}APAS=n1;document.getElementById('ACP').value='';document.getElementById('ANP1').value='';document.getElementById('ANP2').value='';toast('Güncellendi','','ok');}
-function rAll(){rASt();rAA();rSvcs();rBars();rCsts();rCal();rHEd();rHols();rACF();rStk();rKasa();}
+function rAll(){rASt();rAA();rSvcs();rBars();rCsts();rCal();rHEd();rHols();rACF();rStk();rKasa();rCalisanlar();}
 function rASt(){var el=document.getElementById('ASTR');if(!el)return;clnPast();var tc=S.appts.filter(function(a){return a.date===TODAY&&(a.st==='confirmed'||a.st==='pending');}).length;var pc=S.appts.filter(function(a){return a.st==='pending'&&a.date>=TODAY;}).length;var d=new Date();d.setDate(d.getDate()-7);var ws=d.toISOString().split('T')[0];var rev=S.appts.filter(function(a){return a.date>=ws&&(a.st==='confirmed'||a.st==='past');}).reduce(function(s,a){var sv=S.svcs.find(function(x){return x.id===a.sid;});return s+(sv?sv.price:0);},0);el.innerHTML='<div class="stb"><div class="stn">'+tc+'</div><div class="stl">Bugün</div></div><div class="stb"><div class="stn" style="color:var(--ora)">'+pc+'</div><div class="stl">Bekliyor</div></div><div class="stb"><div class="stn">'+S.custs.length+'</div><div class="stl">Müşteri</div></div><div class="stb"><div class="stn" style="font-size:'+(rev>99999?'14px':'20px')+'">'+rev.toLocaleString('tr-TR')+'₺</div><div class="stl">Bu Hafta</div></div>';}
 function rAA(filter){filter=filter||'';var el=document.getElementById('AAL');var lbl=document.getElementById('ARC');if(!el)return;clnPast();var aa=S.appts.filter(function(a){return a.date>=TODAY&&(a.st==='confirmed'||a.st==='pending');}).sort(function(a,b){return a.date!==b.date?(a.date>b.date?1:-1):(a.time>b.time?1:-1);});if(filter){var q=filter.toLowerCase();aa=aa.filter(function(a){return a.name.toLowerCase().includes(q)||a.time.includes(q)||a.date.includes(q)||a.phone.includes(q);});}if(lbl)lbl.textContent=aa.length+' Randevu';if(!aa.length){el.innerHTML='<div class="emp"><div class="ei">📋</div><p>Aktif randevu yok.</p></div>';return;}el.innerHTML=aa.map(function(a){var b=S.barbers.find(function(x){return x.id===a.bid||x.id===parseInt(a.bid);})||{name:'–'};var sv=S.svcs.find(function(x){return x.id===a.sid||x.id===parseInt(a.sid);})||{name:'–',price:0};var ip=a.st==='pending';var apr=ip?'<button class="aab ap" onclick="aApr(\''+a.id+'\')">Onayla</button>':'';return'<div class="ac"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;"><span style="font-size:12px;font-weight:700;color:var(--t2);">'+a.name+'</span><span class="ast '+(ip?'sp':'sc')+'">'+(ip?'Bekliyor':'Onaylı')+'</span></div><div class="asvc">'+sv.name+'</div><div class="ame"><span>📅 '+fmtD(a.date)+'</span><span>🕐 '+a.time+'</span><span>✂️ '+b.name+'</span><span>💰 '+sv.price+'₺</span></div><div class="aac">'+apr+'<button class="aab ch" onclick="aEdt(\''+a.id+'\')">Düzenle</button><button class="aab cn" onclick="aRej(\''+a.id+'\')">İptal</button></div></div>';}).join('');}
 function aApr(id){var a=S.appts.find(function(x){return x.id===id;});if(a){a.st='confirmed';save();}rAA();rASt();rMP();toast('Onaylandı','','ok');if(a)addAN({ic:'✅',tit:'Onaylandı: '+a.name,txt:fmtD(a.date)+' '+a.time});}
 function aRej(id){var a=S.appts.find(function(x){return x.id===id;});if(!a)return;showM({tit:'İptal',sub:a.name,body:'<div style="font-size:12px;color:var(--gr);">İptal edilecek.</div>',ctx:'İptal Et',cc:'dan',oc:"cCnl('"+id+"')",ct:'Vazgeç'});}
 function aEdt(id){var a=S.appts.find(function(x){return x.id===id;});if(!a)return;var so=SL.map(function(t){return'<option value="'+t+'"'+(t===a.time?' selected':'')+'>'+t+'</option>';}).join('');var bo=S.barbers.map(function(b){return'<option value="'+b.id+'"'+(b.id===a.bid?' selected':'')+'>'+b.name+'</option>';}).join('');showM({tit:'Düzenle',sub:a.name,body:'<div class="fld" style="margin-bottom:7px"><label>Tarih</label><input type="date" id="aed" value="'+a.date+'" style="'+IS()+'"></div><div class="fld" style="margin-bottom:7px"><label>Saat</label><div style="position:relative;"><select id="aet" style="'+IS('appearance:none;')+'">'+so+'</select><span style="position:absolute;right:11px;top:50%;transform:translateY(-50%);color:var(--g);pointer-events:none;">▾</span></div></div><div class="fld"><label>Berber</label><div style="position:relative;"><select id="aeb" style="'+IS('appearance:none;')+'">'+bo+'</select><span style="position:absolute;right:11px;top:50%;transform:translateY(-50%);color:var(--g);pointer-events:none;">▾</span></div></div>',ctx:'Kaydet',oc:"cAEdt('"+id+"')",ct:'İptal'});}
 function cAEdt(id){var a=S.appts.find(function(x){return x.id===id;});var d=document.getElementById('aed').value;var t=document.getElementById('aet').value;var b=parseInt(document.getElementById('aeb').value);if(a&&d&&t){var sv=S.svcs.find(function(s){return s.id===a.sid;})||{dur:30};var cf=hasCf(b,d,t,sv.dur,id);if(cf){toast('Çakışma!',cf.name+"'ın randevusuyla çakışıyor.",'err',5000);return;}a.date=d;a.time=t;a.bid=b;save();}closeM();rAll();rMP();toast('Güncellendi','','ok');}
-function expC(){clnPast();var aa=S.appts.filter(function(a){return a.date>=TODAY&&(a.st==='confirmed'||a.st==='pending');}).sort(function(a,b){return a.date!==b.date?(a.date>b.date?1:-1):(a.time>b.time?1:-1);});var rows=['Ad,Telefon,Tarih,Saat,Hizmet,Fiyat,Berber,Durum'];aa.forEach(function(a){var sv=S.svcs.find(function(s){return s.id===a.sid;})||{name:'',price:0};var b=S.barbers.find(function(x){return x.id===a.bid;})||{name:''};rows.push([a.name,a.phone,a.date,a.time,sv.name,sv.price+'₺',b.name,a.st].join(','));});var bl=new Blob(['\uFEFF'+rows.join('\n')],{type:'text/csv;charset=utf-8'});var url=URL.createObjectURL(bl);var ln=document.createElement('a');ln.href=url;ln.download='randevular.csv';ln.click();URL.revokeObjectURL(url);toast('CSV İndirildi','','ok');}
+function expC(){clnPast();var aa=S.appts.filter(function(a){return a.date>=TODAY&&(a.st==='confirmed'||a.st==='pending');}).sort(function(a,b){return a.date!==b.date?(a.date>b.date?1:-1):(a.time>b.time?1:-1);});var rows=['Ad,Telefon,Tarih,Saat,Hizmet,Fiyat,Berber,Durum'];aa.forEach(function(a){var sv=S.svcs.find(function(s){return s.id===a.sid;})||{name:'',price:0};var b=S.barbers.find(function(x){return x.id===a.bid;})||{name:''};rows.push([a.name,a.phone,a.date,a.time,sv.name,sv.price+'₺',b.name,a.st].join(','));});var bl=new Blob([rows.join('\n')],{type:'text/csv;charset=utf-8'});var url=URL.createObjectURL(bl);var ln=document.createElement('a');ln.href=url;ln.download='randevular.csv';ln.click();URL.revokeObjectURL(url);toast('CSV İndirildi','','ok');}
 function expT(){clnPast();var aa=S.appts.filter(function(a){return a.date>=TODAY&&(a.st==='confirmed'||a.st==='pending');}).sort(function(a,b){return a.date!==b.date?(a.date>b.date?1:-1):(a.time>b.time?1:-1);});var ln=['AHMET TEKELİ ERKEK KUAFÖRÜ','─'.repeat(38)];aa.forEach(function(a){var sv=S.svcs.find(function(s){return s.id===a.sid;})||{name:'',price:0};var b=S.barbers.find(function(x){return x.id===a.bid;})||{name:''};ln.push(fmtD(a.date)+' '+a.time+' | '+a.name+' | '+sv.name+' | '+b.name+' | '+sv.price+'₺');});var bl=new Blob([ln.join('\n')],{type:'text/plain;charset=utf-8'});var url=URL.createObjectURL(bl);var l=document.createElement('a');l.href=url;l.download='randevular.txt';l.click();URL.revokeObjectURL(url);toast('TXT İndirildi','','ok');}
 // Takvim
 function rCal(){rBCSR();rCalG();}
@@ -890,7 +920,7 @@ function sfTmz(){_sfU=null;var a1=document.getElementById('sad1');var a2=documen
 function sfA1(){var id=document.getElementById('reid').value.trim();if(!id){toast('Hata','Telefon giriniz.','err');return;}var u=S.custs.find(function(c){return c.phone.replace(/\D/g,'')=== id.replace(/\D/g,'');});if(!u){toast('Bulunamadı','Bu telefon kayıtlı değil.','err');return;}_sfU=u;var ini=u.name.split(' ').map(function(w){return w[0];}).join('').substring(0,2).toUpperCase();var box=document.getElementById('sufb');if(box)box.innerHTML='<div style="display:flex;align-items:center;gap:9px;"><div style="width:32px;height:32px;border-radius:50%;background:rgba(184,146,42,.12);border:1.5px solid var(--g);display:flex;align-items:center;justify-content:center;font-family:Playfair Display,serif;font-size:12px;font-weight:700;color:var(--gd);">'+ini+'</div><div><div style="font-size:13px;font-weight:700;color:var(--t2);">'+u.name+'</div><div style="font-size:10px;color:var(--gr);">'+u.phone+'</div></div></div>';document.getElementById('sad1').style.display='none';document.getElementById('sad2').style.display='block';document.getElementById('rep1').value='';document.getElementById('rep2').value='';}
 function sfA2(){if(!_sfU){toast('Hata','Tekrar deneyin.','err');return;}var p1=document.getElementById('rep1').value;var p2=document.getElementById('rep2').value;if(!p1||p1.length<6){toast('Hata','En az 6 karakter.','err');return;}if(p1!==p2){toast('Hata','Şifreler uyuşmuyor.','err');return;}_sfU.pass=p1;save();toast('Güncellendi!','Yeni şifrenizle giriş yapabilirsiniz.','ok',4000);sfTmz();swMTn('giris');}
 function sfGr(){document.getElementById('sad1').style.display='block';document.getElementById('sad2').style.display='none';_sfU=null;}
-function swAT(name,btn){['randevular','takvim','hizmetler','berberler','ayarlar','musteriler','stok','kasa'].forEach(function(t){var el=document.getElementById('at-'+t);if(el)el.style.display=t===name?'block':'none';});document.querySelectorAll('#APV .tabs .tb2').forEach(function(b){b.classList.remove('active');});btn.classList.add('active');if(name==='takvim')rCal();if(name==='kasa'){initKasa();rKasa();}if(name==='ayarlar'){rHEd();rHols();var p=lsL('wap');if(p){S.waP=p;var el=document.getElementById('AWA');if(el)el.value=p;var d=document.getElementById('WAD');if(d){d.style.display='block';d.textContent='✓ Kayıtlı: +'+p;}}}}
+function swAT(name,btn){['randevular','takvim','hizmetler','berberler','ayarlar','musteriler','stok','kasa','calisanlar'].forEach(function(t){var el=document.getElementById('at-'+t);if(el)el.style.display=t===name?'block':'none';});document.querySelectorAll('#APV .tabs .tb2').forEach(function(b){b.classList.remove('active');});btn.classList.add('active');if(name==='takvim')rCal();if(name==='kasa'){initKasa();rKasa();}if(name==='calisanlar'){rCalisanlar();}if(name==='ayarlar'){rHEd();rHols();var p=lsL('wap');if(p){S.waP=p;var el=document.getElementById('AWA');if(el)el.value=p;var d=document.getElementById('WAD');if(d){d.style.display='block';d.textContent='✓ Kayıtlı: +'+p;}}}}
 // ── STOK TAKİBİ ──
 function rStk(){
   var el=document.getElementById('STKL');var lbl=document.getElementById('STK_C');if(!el)return;
@@ -1327,7 +1357,7 @@ function rptCSV(){
     var b=S.barbers.find(function(x){return x.id===parseInt(k.bid);})||{name:'Genel'};
     rows.push([k.tarih,k.saat,k.tip,k.aciklama,k.odeme,b.name,k.tutar+'₺'].join(','));
   });
-  var bl=new Blob(['\uFEFF'+rows.join('\n')],{type:'text/csv;charset=utf-8'});
+  var bl=new Blob([rows.join('\n')],{type:'text/csv;charset=utf-8'});
   var url=URL.createObjectURL(bl);var ln=document.createElement('a');ln.href=url;ln.download='kasa-rapor.csv';ln.click();URL.revokeObjectURL(url);
   toast('CSV İndirildi','kasa-rapor.csv','ok');
 }
@@ -1410,6 +1440,159 @@ function fbLoad(cb){
 }
 
 // ── GERÇEK ZAMANLI DİNLEME (SSE) ──
+
+
+// ── MÜŞTERİ ÇIKTI FONKSİYONLARI ──
+function musteriCiktiCSV(){
+  if(!S.custs.length){toast('Hata','Kayıtlı müşteri yok.','err');return;}
+  var rows=['Ad Soyad,Telefon,VIP,Toplam Randevu,Toplam Harcama'];
+  S.custs.forEach(function(c){
+    var cnt=S.appts.filter(function(a){return a.uid===c.id;}).length;
+    var sp=S.appts.filter(function(a){return a.uid===c.id&&(a.st==='confirmed'||a.st==='past');})
+      .reduce(function(s,a){var sv=S.svcs.find(function(x){return x.id===a.sid||x.id===parseInt(a.sid);});return s+(sv?sv.price:0);},0);
+    rows.push([c.name,c.phone,(c.vip?'VIP':''),cnt,sp+'₺'].join(','));
+  });
+  var bl=new Blob([rows.join('\n')],{type:'text/csv;charset=utf-8'});
+  var url=URL.createObjectURL(bl);var ln=document.createElement('a');ln.href=url;ln.download='musteriler.csv';ln.click();URL.revokeObjectURL(url);
+  toast('CSV İndirildi',S.custs.length+' müşteri','ok');
+}
+
+function musteriCiktiTXT(){
+  if(!S.custs.length){toast('Hata','Kayıtlı müşteri yok.','err');return;}
+  var lines=['AHMET TEKELİ ERKEK KUAFÖRÜ — MÜŞTERİ LİSTESİ','─'.repeat(40),'Tarih: '+new Date().toLocaleDateString('tr-TR'),'Toplam: '+S.custs.length+' müşteri','─'.repeat(40)];
+  S.custs.forEach(function(c,i){
+    var cnt=S.appts.filter(function(a){return a.uid===c.id;}).length;
+    lines.push((i+1)+'. '+c.name+' · '+c.phone+(c.vip?' ★VIP':'')+' · '+cnt+' randevu');
+  });
+  var bl=new Blob([lines.join('\n')],{type:'text/plain;charset=utf-8'});
+  var url=URL.createObjectURL(bl);var ln=document.createElement('a');ln.href=url;ln.download='musteriler.txt';ln.click();URL.revokeObjectURL(url);
+  toast('TXT İndirildi',S.custs.length+' müşteri','ok');
+}
+
+function musteriCiktiWA(){
+  if(!S.custs.length){toast('Hata','Kayıtlı müşteri yok.','err');return;}
+  // WhatsApp için numara listesi modal göster
+  var nums=S.custs.map(function(c){return c.phone.replace(/\D/g,'');}).filter(function(p){return p.length>=10;});
+  var listHtml='<div style="background:var(--s2);border:1px solid var(--b);border-radius:8px;padding:10px;max-height:200px;overflow-y:auto;font-size:12px;line-height:1.8;color:var(--t2);">';
+  S.custs.forEach(function(c){listHtml+=c.name+' — '+c.phone+'<br>';});
+  listHtml+='</div><div style="font-size:11px;color:var(--gr);margin-top:8px;">Toplam '+S.custs.length+' kayıtlı müşteri.</div>';
+  showM({tit:'Müşteri Listesi',sub:'',body:listHtml,ctx:'Kapat',oc:'closeM()',ct:''});
+}
+
+// ── ÇALIŞAN PERFORMANSI ──
+function rCalisanlar(){
+  var dateEl = document.getElementById('CAL_DATE');
+  if(!dateEl) return;
+  if(!dateEl.value) dateEl.value = TODAY;
+  var tarih = dateEl.value;
+
+  var ozetEl = document.getElementById('CAL_OZET');
+  var listeEl = document.getElementById('CAL_LISTE');
+  if(!ozetEl || !listeEl) return;
+
+  // O güne ait tüm randevular
+  var gunAppts = S.appts.filter(function(a){
+    return a.date === tarih && (a.st==='confirmed'||a.st==='pending'||a.st==='past');
+  });
+
+  // Genel özet
+  var topCiro = gunAppts.reduce(function(s,a){
+    var sv=S.svcs.find(function(x){return x.id===a.sid||x.id===parseInt(a.sid);});
+    return s+(sv?sv.price:0);
+  },0);
+  var topHakedis = S.barbers.reduce(function(s,b){
+    var bCiro=gunAppts.filter(function(a){return a.bid===b.id||a.bid===String(b.id);}).reduce(function(s2,a){
+      var sv=S.svcs.find(function(x){return x.id===a.sid||x.id===parseInt(a.sid);});
+      return s2+(sv?sv.price:0);
+    },0);
+    return s+Math.round(bCiro*(b.yuzde||40)/100);
+  },0);
+
+  ozetEl.innerHTML =
+    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:2px;">'
+    +'<div class="stb"><div class="stn">'+gunAppts.length+'</div><div class="stl">Randevu</div></div>'
+    +'<div class="stb"><div class="stn" style="font-size:20px;">'+topCiro.toLocaleString('tr-TR')+'₺</div><div class="stl">Toplam Ciro</div></div>'
+    +'<div class="stb"><div class="stn" style="color:var(--green);font-size:20px;">'+topHakedis.toLocaleString('tr-TR')+'₺</div><div class="stl">Toplam Hakediş</div></div>'
+    +'</div>';
+
+  if(!gunAppts.length){
+    listeEl.innerHTML='<div class="emp"><div class="ei">📅</div><p>Bu gün randevu yok.</p></div>';
+    return;
+  }
+
+  // Her berber için kart
+  var html2 = '';
+  S.barbers.forEach(function(b){
+    var bAppts = gunAppts.filter(function(a){return a.bid===b.id||a.bid===String(b.id);});
+    var ciro = bAppts.reduce(function(s,a){
+      var sv=S.svcs.find(function(x){return x.id===a.sid||x.id===parseInt(a.sid);});
+      return s+(sv?sv.price:0);
+    },0);
+    var yz = b.yuzde||40;
+    var hakedis = Math.round(ciro*yz/100);
+    var salon = ciro - hakedis;
+
+    if(!bAppts.length){
+      html2 += '<div style="background:var(--s2);border:1px solid var(--b);border-radius:12px;padding:12px;margin-bottom:9px;opacity:.5;">'
+        +'<div style="display:flex;align-items:center;gap:9px;">'
+        +'<div class="bav">'+b.ini+'</div>'
+        +'<div><div style="font-size:14px;font-weight:700;color:var(--t2);">'+b.name+'</div>'
+        +'<div style="font-size:11px;color:var(--gr);">Bu gün randevu yok</div></div>'
+        +'</div></div>';
+      return;
+    }
+
+    // Randevu detay listesi
+    var detayHtml = bAppts.sort(function(a,b2){return t2m(a.time)-t2m(b2.time);}).map(function(a){
+      var sv=S.svcs.find(function(x){return x.id===a.sid||x.id===parseInt(a.sid);})||{name:'?',price:0};
+      var isPend = a.st==='pending';
+      return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--b);">'
+        +'<div style="font-size:12px;font-weight:800;color:var(--gd);width:40px;flex-shrink:0;">'+a.time+'</div>'
+        +'<div style="flex:1;min-width:0;">'
+        +'<div style="font-size:12px;font-weight:700;color:var(--t2);">'+a.name+'</div>'
+        +'<div style="font-size:10px;color:var(--gr);">'+sv.name+'</div>'
+        +'</div>'
+        +'<div style="text-align:right;flex-shrink:0;">'
+        +'<div style="font-size:13px;font-weight:800;color:var(--gd);">'+sv.price.toLocaleString('tr-TR')+'₺</div>'
+        +(isPend?'<div style="font-size:9px;color:var(--ora);font-weight:800;">BEKLEYOR</div>':'')
+        +'</div>'
+        +'</div>';
+    }).join('');
+
+    html2 += '<div style="background:var(--s);border:1px solid var(--b);border-radius:12px;padding:13px;margin-bottom:9px;box-shadow:0 1px 4px rgba(0,0,0,.05);">'
+      // Başlık
+      +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:11px;">'
+      +'<div class="bav" style="border-color:var(--g);background:rgba(184,146,42,.1);">'+b.ini+'</div>'
+      +'<div style="flex:1;">'
+      +'<div style="font-size:15px;font-weight:800;color:var(--t2);">'+b.name+'</div>'
+      +'<div style="font-size:10px;color:var(--gr);">'+b.role+' · %'+yz+' hakediş · '+bAppts.length+' randevu</div>'
+      +'</div>'
+      +'<div style="text-align:right;">'
+      +'<div style="font-size:20px;font-weight:900;color:var(--gd);">'+ciro.toLocaleString('tr-TR')+'₺</div>'
+      +'<div style="font-size:10px;color:var(--gr);">Ciro</div>'
+      +'</div>'
+      +'</div>'
+      // Hakediş / Salon payı
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:11px;">'
+      +'<div style="background:rgba(46,125,79,.08);border:1px solid rgba(46,125,79,.2);border-radius:9px;padding:9px;text-align:center;">'
+      +'<div style="font-size:17px;font-weight:900;color:var(--green);">'+hakedis.toLocaleString('tr-TR')+'₺</div>'
+      +'<div style="font-size:10px;color:var(--gr);margin-top:2px;">Berber Payı (%'+yz+')</div>'
+      +'</div>'
+      +'<div style="background:rgba(26,95,138,.08);border:1px solid rgba(26,95,138,.2);border-radius:9px;padding:9px;text-align:center;">'
+      +'<div style="font-size:17px;font-weight:900;color:var(--blu);">'+salon.toLocaleString('tr-TR')+'₺</div>'
+      +'<div style="font-size:10px;color:var(--gr);margin-top:2px;">Salon Payı (%'+(100-yz)+')</div>'
+      +'</div>'
+      +'</div>'
+      // Randevu listesi
+      +'<div style="border-top:1px solid var(--b);padding-top:8px;">'
+      +'<div style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--gd);margin-bottom:5px;">Randevu Detayı</div>'
+      +detayHtml
+      +'</div>'
+      +'</div>';
+  });
+
+  listeEl.innerHTML = html2;
+}
 
 
 // ── AKILLI POLLING ──
@@ -1534,7 +1717,12 @@ function pollFirebase(){
       clnPast();
       rTG();
       var adminOpen2 = document.getElementById('APV')&&document.getElementById('APV').style.display!=='none';
-      if(adminOpen2) rAll();
+      if(adminOpen2){
+        rAll();
+        // Çalışanlar sekmesi açıksa güncelle
+        var calEl = document.getElementById('at-calisanlar');
+        if(calEl&&calEl.style.display!=='none') rCalisanlar();
+      }
       var musteriOpen = document.getElementById('MLG')&&document.getElementById('MLG').style.display!=='none';
       if(musteriOpen&&S.user) rMP();
     }
