@@ -385,7 +385,15 @@ body{font-family:'Raleway',sans-serif;font-weight:600;font-size:14px;background:
             <div class="shdr"><div class="slbl" style="margin-bottom:0;">Aktif Randevular</div><span class="scnt" id="ARC">–</span></div>
             <div class="gdv"></div>
             <div class="exr"><button class="exb" onclick="expC()">📥 CSV</button><button class="exb" onclick="expT()">📄 TXT</button></div>
-            <input class="srch" type="text" placeholder="🔍  İsim / tarih / saat ara..." oninput="rAA(this.value)">
+
+<div style="display:flex;gap:6px;align-items:center;margin-bottom:9px;">
+              <button class="cb" onclick="aaDay(-1)" style="padding:8px 12px;">‹</button>
+              <input type="date" id="AA_DATE" onchange="rAA()" style="flex:1;background:var(--s2);border:1px solid var(--b);border-radius:8px;padding:9px 11px;color:var(--t);font-family:Raleway,sans-serif;font-size:13px;font-weight:700;outline:none;text-align:center;">
+              <button class="cb" onclick="aaDay(1)" style="padding:8px 12px;">›</button>
+              <button class="cb active" onclick="aaToday()" style="padding:8px 10px;">Bugün</button>
+            </div>
+            <input class="srch" type="text" placeholder="🔍  Bu günde isim / saat ara..." oninput="rAA(this.value)">
+
             <div id="AAL"></div>
           </div>
         </div>
@@ -774,7 +782,32 @@ function cACks(){lsR('as');closeM();document.getElementById('APV').style.display
 function aSD(){var c=document.getElementById('ACP').value;var n1=document.getElementById('ANP1').value;var n2=document.getElementById('ANP2').value;if(c!==APAS){toast('Hata','Mevcut şifre yanlış.','err');return;}if(!n1||n1.length<6){toast('Hata','En az 6 karakter.','err');return;}if(n1!==n2){toast('Hata','Şifreler uyuşmuyor.','err');return;}APAS=n1;document.getElementById('ACP').value='';document.getElementById('ANP1').value='';document.getElementById('ANP2').value='';toast('Güncellendi','','ok');}
 function rAll(){rASt();rAA();rSvcs();rBars();rCsts();rCal();rHEd();rHols();rACF();rStk();rKasa();rCalisanlar();}
 function rASt(){var el=document.getElementById('ASTR');if(!el)return;clnPast();var tc=S.appts.filter(function(a){return a.date===TODAY&&(a.st==='confirmed'||a.st==='pending');}).length;var pc=S.appts.filter(function(a){return a.st==='pending'&&a.date>=TODAY;}).length;var d=new Date();d.setDate(d.getDate()-7);var ws=d.toISOString().split('T')[0];var rev=S.appts.filter(function(a){return a.date>=ws&&(a.st==='confirmed'||a.st==='past');}).reduce(function(s,a){var sv=S.svcs.find(function(x){return x.id===a.sid;});return s+(sv?sv.price:0);},0);el.innerHTML='<div class="stb"><div class="stn">'+tc+'</div><div class="stl">Bugün</div></div><div class="stb"><div class="stn" style="color:var(--ora)">'+pc+'</div><div class="stl">Bekliyor</div></div><div class="stb"><div class="stn">'+S.custs.length+'</div><div class="stl">Müşteri</div></div><div class="stb"><div class="stn" style="font-size:'+(rev>99999?'14px':'20px')+'">'+rev.toLocaleString('tr-TR')+'₺</div><div class="stl">Bu Hafta</div></div>';}
-function rAA(filter){filter=filter||'';var el=document.getElementById('AAL');var lbl=document.getElementById('ARC');if(!el)return;clnPast();var aa=S.appts.filter(function(a){return a.date>=TODAY&&(a.st==='confirmed'||a.st==='pending');}).sort(function(a,b){return a.date!==b.date?(a.date>b.date?1:-1):(a.time>b.time?1:-1);});if(filter){var q=filter.toLowerCase();aa=aa.filter(function(a){return a.name.toLowerCase().includes(q)||a.time.includes(q)||a.date.includes(q)||a.phone.includes(q);});}if(lbl)lbl.textContent=aa.length+' Randevu';if(!aa.length){el.innerHTML='<div class="emp"><div class="ei">📋</div><p>Aktif randevu yok.</p></div>';return;}el.innerHTML=aa.map(function(a){var b=S.barbers.find(function(x){return x.id===a.bid||x.id===parseInt(a.bid);})||{name:'–'};var sv=S.svcs.find(function(x){return x.id===a.sid||x.id===parseInt(a.sid);})||{name:'–',price:0};var ip=a.st==='pending';var apr=ip?'<button class="aab ap" onclick="aApr(\''+a.id+'\')">Onayla</button>':'';return'<div class="ac"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;"><span style="font-size:12px;font-weight:700;color:var(--t2);">'+a.name+'</span><span class="ast '+(ip?'sp':'sc')+'">'+(ip?'Bekliyor':'Onaylı')+'</span></div><div class="asvc">'+sv.name+'</div><div class="ame"><span>📅 '+fmtD(a.date)+'</span><span>🕐 '+a.time+'</span><span>✂️ '+b.name+'</span><span>💰 '+sv.price+'₺</span></div><div class="aac">'+apr+'<button class="aab ch" onclick="aEdt(\''+a.id+'\')">Düzenle</button><button class="aab cn" onclick="aRej(\''+a.id+'\')">İptal</button></div></div>';}).join('');}
+
+function rAA(filter){
+  filter=filter||'';
+  var el=document.getElementById('AAL');var lbl=document.getElementById('ARC');if(!el)return;
+  clnPast();
+  var de=document.getElementById('AA_DATE');
+  if(de&&!de.value)de.value=TODAY;
+  var selDate=de?de.value:TODAY;
+  var aa=S.appts.filter(function(a){return a.date===selDate&&(a.st==='confirmed'||a.st==='pending');})
+    .sort(function(a,b){return a.time>b.time?1:-1;});
+  if(filter){var q=filter.toLowerCase();aa=aa.filter(function(a){return a.name.toLowerCase().includes(q)||a.time.includes(q)||a.phone.includes(q);});}
+  if(lbl)lbl.textContent=aa.length+' Randevu';
+  var dayCiro=aa.reduce(function(s,a){var sv=S.svcs.find(function(x){return x.id===a.sid||x.id===parseInt(a.sid);});return s+(sv?sv.price:0);},0);
+  var badge='';
+  if(selDate===TODAY)badge='<span style="font-size:9px;font-weight:800;letter-spacing:1px;background:linear-gradient(135deg,var(--gd),var(--gl));color:#fff;border-radius:50px;padding:2px 9px;margin-left:7px;">BUGÜN</span>';
+  var head='<div style="display:flex;align-items:center;justify-content:space-between;margin:4px 0 10px;padding-bottom:6px;border-bottom:2px solid var(--g);">'
+    +'<div style="display:flex;align-items:center;"><span style="font-family:Playfair Display,serif;font-size:14px;font-weight:700;color:var(--t);">'+dowFull(selDate)+', '+fmtD(selDate)+'</span>'+badge+'</div>'
+    +'<span style="font-size:10px;font-weight:700;color:var(--gr);">'+aa.length+' randevu · '+dayCiro.toLocaleString('tr-TR')+'₺</span>'
+    +'</div>';
+  if(!aa.length){el.innerHTML=head+'<div class="emp"><div class="ei">📋</div><p>Bu gün randevu yok.</p></div>';return;}
+  el.innerHTML=head+aa.map(function(a){var b=S.barbers.find(function(x){return x.id===a.bid||x.id===parseInt(a.bid);})||{name:'–'};var sv=S.svcs.find(function(x){return x.id===a.sid||x.id===parseInt(a.sid);})||{name:'–',price:0};var ip=a.st==='pending';var apr=ip?'<button class="aab ap" onclick="aApr(\''+a.id+'\')">Onayla</button>':'';return'<div class="ac"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;"><span style="font-size:12px;font-weight:700;color:var(--t2);">'+a.name+'</span><span class="ast '+(ip?'sp':'sc')+'">'+(ip?'Bekliyor':'Onaylı')+'</span></div><div class="asvc">'+sv.name+'</div><div class="ame"><span>🕐 '+a.time+'</span><span>📞 '+a.phone+'</span><span>✂️ '+b.name+'</span><span>💰 '+sv.price+'₺</span></div><div class="aac">'+apr+'<button class="aab ch" onclick="aEdt(\''+a.id+'\')">Düzenle</button><button class="aab cn" onclick="aRej(\''+a.id+'\')">İptal</button></div></div>';}).join('');
+}
+function dowFull(ds){var d=['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'];return d[new Date(ds+'T00:00:00').getDay()];}
+function aaDay(n){var de=document.getElementById('AA_DATE');if(!de)return;var d=new Date((de.value||TODAY)+'T00:00:00');d.setDate(d.getDate()+n);de.value=d.toISOString().split('T')[0];rAA();}
+function aaToday(){var de=document.getElementById('AA_DATE');if(de)de.value=TODAY;rAA();}
+
 function aApr(id){var a=S.appts.find(function(x){return x.id===id;});if(a){a.st='confirmed';save();}rAA();rASt();rMP();toast('Onaylandı','','ok');if(a)addAN({ic:'✅',tit:'Onaylandı: '+a.name,txt:fmtD(a.date)+' '+a.time});}
 function aRej(id){var a=S.appts.find(function(x){return x.id===id;});if(!a)return;showM({tit:'İptal',sub:a.name,body:'<div style="font-size:12px;color:var(--gr);">İptal edilecek.</div>',ctx:'İptal Et',cc:'dan',oc:"cCnl('"+id+"')",ct:'Vazgeç'});}
 function aEdt(id){var a=S.appts.find(function(x){return x.id===id;});if(!a)return;var so=SL.map(function(t){return'<option value="'+t+'"'+(t===a.time?' selected':'')+'>'+t+'</option>';}).join('');var bo=S.barbers.map(function(b){return'<option value="'+b.id+'"'+(b.id===a.bid?' selected':'')+'>'+b.name+'</option>';}).join('');showM({tit:'Düzenle',sub:a.name,body:'<div class="fld" style="margin-bottom:7px"><label>Tarih</label><input type="date" id="aed" value="'+a.date+'" style="'+IS()+'"></div><div class="fld" style="margin-bottom:7px"><label>Saat</label><div style="position:relative;"><select id="aet" style="'+IS('appearance:none;')+'">'+so+'</select><span style="position:absolute;right:11px;top:50%;transform:translateY(-50%);color:var(--g);pointer-events:none;">▾</span></div></div><div class="fld"><label>Berber</label><div style="position:relative;"><select id="aeb" style="'+IS('appearance:none;')+'">'+bo+'</select><span style="position:absolute;right:11px;top:50%;transform:translateY(-50%);color:var(--g);pointer-events:none;">▾</span></div></div>',ctx:'Kaydet',oc:"cAEdt('"+id+"')",ct:'İptal'});}
