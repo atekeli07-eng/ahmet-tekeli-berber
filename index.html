@@ -724,23 +724,41 @@ function subR(){
   var uid=S.user?S.user.id:null;
   var apt={id:'a'+Date.now(),name:name,phone:phone,bid:S.selB,sid:sid,date:date,time:S.selT,st:'confirmed',uid:uid,ro:S.selRO};
   S.appts.push(apt);save();
-  var sv2=S.svcs.find(function(s){return s.id===sid;})||{name:'?'};
-  var bn=(S.barbers.find(function(b){return b.id===S.selB;})||{name:'?'}).name;
-  var st=S.selT;S.selT=null;
-  if(!S.user){document.getElementById('rn').value='';document.getElementById('rp').value='';}
+ var apt={id:'a'+Date.now(),name:name,phone:phone,bid:S.selB,sid:sid,date:date,time:S.selT,st:'confirmed',uid:uid,ro:S.selRO};
+  var selB=S.selB,selT2=S.selT,selDur=sv.dur;
+  fbGet('/appts').then(function(fresh){
+    if(fresh&&typeof fresh==='object'){
+      var freshList=Object.values(fresh);
+      var conflict=freshList.find(function(a){
+        if((a.bid!=selB)||(a.date!==date)||a.st==='cancelled'||a.st==='past')return false;
+        var asv=S.svcs.find(function(s){return s.id===a.sid||s.id===parseInt(a.sid);})||{dur:30};
+        var as=t2m(a.time),ae=as+asv.dur,ms=t2m(selT2),me=ms+selDur;
+        return ms<ae&&me>as;
+      });
+      if(conflict){
+        toast('Çakışma!','Bu saat az önce başkası tarafından alındı, lütfen başka saat seçin.','err',5500);
+        S.appts=freshList;clnPast();rTG();return;
+      }
+    }
+    S.appts.push(apt);_origSave();fbSet('/appts/'+apt.id,apt);_randevuOK(apt);
+  }).catch(function(e){
+    S.appts.push(apt);_origSave();fbSet('/appts/'+apt.id,apt);_randevuOK(apt);
+  });
+}
+function _randevuOK(apt){
+  var sv2=S.svcs.find(function(s){return s.id===apt.sid;})||{name:'?'};
+  var bn=(S.barbers.find(function(b){return b.id===apt.bid;})||{name:'?'}).name;
+  var st=apt.time;S.selT=null;
+  if(!S.user){var rn=document.getElementById('rn');var rp=document.getElementById('rp');if(rn)rn.value='';if(rp)rp.value='';}
   rTG();rSvc();
-  addAN({ic:'📋',tit:'Yeni Randevu: '+name,txt:sv2.name+' · '+fmtD(date)+' '+st+' · '+bn});
-  toast('Randevu Alındı! ✂️',name+' · '+sv2.name+' · '+fmtD(date)+' '+st,'ok',4500);
-  // Firebase'e yaz — SSE diğer cihazları anında günceller
-  var apptObj={};S.appts.forEach(function(a){apptObj[a.id]=a;});
-  fbSet('/appts', S.appts.length ? apptObj : null);
-  // Local UI anında güncelle
+  addAN({ic:'📋',tit:'Yeni Randevu: '+apt.name,txt:sv2.name+' · '+fmtD(apt.date)+' '+st+' · '+bn});
+  toast('Randevu Alındı! ✂️',apt.name+' · '+sv2.name+' · '+fmtD(apt.date)+' '+st,'ok',4500);
   rTG();rAll();
   if(S.user){rMP();chkRem();}
 }
 // MÜŞTERİ
 function mGrs(){var id=document.getElementById('lid').value.trim();var pas=document.getElementById('lpas').value;var u=S.custs.find(function(c){return c.phone.replace(/\D/g,'')=== id.replace(/\D/g,'')&&c.pass===pas;});if(!u){toast('Hata','Bilgiler hatalı.','err');return;}S.user=u;lsS('uid',u.id);rMP();chkRem();filF();toast('Hoş Geldiniz!',u.name,'ok');}
-function mKyt(){var n=document.getElementById('regn').value.trim();var p=document.getElementById('regp').value.trim();var ps=document.getElementById('regpas').value;var ps2=document.getElementById('regpas2').value;if(!n||!p||!ps){toast('Hata','Tüm alanları doldurunuz.','err');return;}if(p.replace(/\D/g,'').length<10){toast('Hata','Geçerli telefon giriniz.','err');return;}if(ps!==ps2){toast('Hata','Şifreler uyuşmuyor.','err');return;}if(ps.length<6){toast('Hata','Şifre en az 6 karakter.','err');return;}if(S.custs.find(function(c){return c.phone.replace(/\D/g,'')=== p.replace(/\D/g,'');})){toast('Hata','Bu telefon kayıtlı.','err');return;}var u={id:'u'+Date.now(),name:n,phone:p,pass:ps,vip:false};S.custs.push(u);S.user=u;lsS('uid',u.id);save();filF();rMP();rAll();toast('Hesap Oluşturuldu!',n,'ok');}
+function mKyt(){var n=document.getElementById('regn').value.trim();var p=document.getElementById('regp').value.trim();var ps=document.getElementById('regpas').value;var ps2=document.getElementById('regpas2').value;if(!n||!p||!ps){toast('Hata','Tüm alanları doldurunuz.','err');return;}if(p.replace(/\D/g,'').length<10){toast('Hata','Geçerli telefon giriniz.','err');return;}if(ps!==ps2){toast('Hata','Şifreler uyuşmuyor.','err');return;}if(ps.length<6){toast('Hata','Şifre en az 6 karakter.','err');return;}if(S.custs.find(function(c){return c.phone.replace(/\D/g,'')=== p.replace(/\D/g,'');})){toast('Hata','Bu telefon kayıtlı.','err');return;}var u={id:'u'+Date.now(),name:n,phone:p,pass:ps,vip:false};S.custs.push(u);S.user=u;lsS('uid',u.id);var tel=p.replace(/\D/g,'');var bag=0;S.appts.forEach(function(a){if(!a.uid&&a.phone&&a.phone.replace(/\D/g,'')===tel){a.uid=u.id;bag++;fbSet('/appts/'+a.id,a);}});save();filF();rMP();rAll();if(bag>0){toast('Hesap Oluşturuldu! 🎉',n+' · '+bag+' eski randevunuz eklendi','ok',5000);}else{toast('Hesap Oluşturuldu!',n,'ok');}}
 function mCks(){showM({tit:'Çıkış',sub:'',body:'<div style="font-size:12px;color:var(--gr);">Çıkış yapmak istiyor musun?</div>',ctx:'Çıkış',cc:'dan',oc:'cMCks()',ct:'Vazgeç'});}
 function cMCks(){S.user=null;lsR('uid');closeM();document.getElementById('MLG').style.display='none';document.getElementById('MLV').style.display='block';var rn=document.getElementById('rn');var rp=document.getElementById('rp');if(rn)rn.value='';if(rp)rp.value='';toast('Çıkış Yapıldı','','inf');}
 function mSD(){showM({tit:'Şifre Değiştir',sub:'',body:'<div class="fld" style="margin-bottom:7px"><label>Mevcut</label><input type="password" id="msd1" placeholder="Mevcut" style="'+IS()+'"></div><div class="fld" style="margin-bottom:7px"><label>Yeni</label><input type="password" id="msd2" placeholder="En az 6 karakter" style="'+IS()+'"></div><div class="fld"><label>Tekrar</label><input type="password" id="msd3" placeholder="Tekrar" style="'+IS()+'"></div>',ctx:'Güncelle',oc:'cMSD()',ct:'İptal'});}
@@ -1410,7 +1428,7 @@ function fbDel(path){return fetch(FB+path+'.json',{method:'DELETE'}).catch(funct
 
 function fbSave(){
   var apptObj={};S.appts.forEach(function(a){apptObj[a.id]=a;});
-  fbSet('/appts', S.appts.length ? apptObj : null);
+  // randevular toptan yazilmiyor (tekil yazma subR'da)
   var custObj={};S.custs.forEach(function(c){custObj[c.id]=c;});
   fbSet('/custs', S.custs.length ? custObj : null);
   // Config — barbers yuzde dahil her şey
@@ -1792,7 +1810,7 @@ fbLoad(function(){
   if(lsL('as')==='1'){rAll();}
   if(S.user)chkRem();
   // Her zaman polling başlat — dolu saatler anında görünsün
-  _lastAC=S.appts.filter(function(a){return a.st==='confirmed'||a.st==='pending';}).length;
+ baslatPolling();
 });
 
 setInterval(function(){if(S.user)chkRem();},60000);
