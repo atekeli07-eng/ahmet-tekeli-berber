@@ -1640,13 +1640,12 @@ function rCalisanlar(){
       +'</div>'
       +'</div>'
       // Randevu listesi
-      +'<div style="border-top:1px solid var(--b);padding-top:8px;">'
-      +'<div style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--gd);margin-bottom:5px;">Randevu Detayı</div>'
-      +detayHtml
+   +'<div style="border-top:1px solid var(--b);padding-top:8px;">'
+      +'<div onclick="var d=this.nextElementSibling;d.style.display=d.style.display===\'none\'?\'block\':\'none\';" style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--gd);cursor:pointer;display:flex;align-items:center;justify-content:space-between;">Randevu Detayı <span style="font-size:13px;">▾</span></div>'
+     +'<div style="display:none;margin-top:5px;">'+detayHtml+'</div>'
       +'</div>'
       +'</div>';
   });
-
   listeEl.innerHTML = html2;
 }
 
