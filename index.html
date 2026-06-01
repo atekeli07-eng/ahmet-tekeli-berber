@@ -660,21 +660,28 @@ function opSl(ds,bid){
   var dow=new Date(ds+'T00:00:00').getDay();
   var w=S.wh[dow];
   if(!w||!w.o)return[];
-  // Berber özel saati aktifse onu kullan
   var b=bid?S.barbers.find(function(x){return x.id===bid;}):null;
-  var ch=b&&b.cusHrs&&b.cusHrs.aktif?b.cusHrs:null;
-  var sm=t2m(ch?ch.start:w.s);
-  var em=t2m(ch?ch.end:w.e);
-  var breaks=ch&&ch.breaks?ch.breaks:[];
+  // Berberin 3 blok ayarı varsa onu kullan
+  if(b&&b.bloklar){
+    var bl=b.bloklar;
+    var araliklar=[];
+    ['sabah','ogle','aksam'].forEach(function(key){
+      var x=bl[key];
+      if(x&&x.aktif)araliklar.push([t2m(x.start),t2m(x.end)]);
+    });
+    if(!araliklar.length)return[];
+    return SL.filter(function(t){
+      var tm=t2m(t);
+      for(var i=0;i<araliklar.length;i++){
+        if(tm>=araliklar[i][0]&&tm<araliklar[i][1])return true;
+      }
+      return false;
+    });
+  }
+  var sm=t2m(w.s),em=t2m(w.e);
   return SL.filter(function(t){
     var tm=t2m(t);
-    if(tm<sm||tm>=em)return false;
-    // Mola saatlerini çıkar
-    for(var i=0;i<breaks.length;i++){
-      var bs=t2m(breaks[i].s),be=t2m(breaks[i].e);
-      if(tm>=bs&&tm<be)return false;
-    }
-    return true;
+    return tm>=sm&&tm<em;
   });
 }
 function bsSl(bid,ds,ex){var bz={};S.appts.filter(function(a){return a.bid===bid&&a.date===ds&&a.st!=='cancelled'&&a.st!=='past'&&a.id!==ex;}).forEach(function(a){var sv=S.svcs.find(function(s){return s.id===a.sid;})||{dur:30};var sm=t2m(a.time),em=sm+sv.dur;SL.forEach(function(t){var tm=t2m(t);if(tm>=sm&&tm<em)bz[t]=true;});});return bz;}
@@ -870,44 +877,43 @@ function barSaatAyar(bid){
 
 function rBarSaatForm(bid){
   var b=S.barbers.find(function(x){return x.id===bid;});if(!b)return;
-  if(!b.cusHrs)b.cusHrs={aktif:false,start:'09:00',end:'22:00',breaks:[]};
-  var ch=b.cusHrs;
-  var content=document.getElementById('BAR_HRS_CONTENT');
-  var breaksHtml=ch.breaks.map(function(br,i){
-    return'<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">'
-      +'<input type="time" id="brk-s-'+i+'" value="'+br.s+'" style="flex:1;background:var(--s2);border:1px solid var(--b);border-radius:7px;padding:7px;color:var(--t);font-family:Raleway,sans-serif;font-size:13px;font-weight:700;outline:none;text-align:center;">'
-      +'<span style="color:var(--gr);font-size:12px;">–</span>'
-      +'<input type="time" id="brk-e-'+i+'" value="'+br.e+'" style="flex:1;background:var(--s2);border:1px solid var(--b);border-radius:7px;padding:7px;color:var(--t);font-family:Raleway,sans-serif;font-size:13px;font-weight:700;outline:none;text-align:center;">'
-      +'<button onclick="brk_del('+bid+','+i+')" style="background:rgba(192,57,43,.08);border:1px solid rgba(192,57,43,.2);border-radius:6px;width:26px;height:26px;color:var(--red);cursor:pointer;font-size:12px;">✕</button>'
+  if(!b.bloklar)b.bloklar={sabah:{aktif:true,start:'09:00',end:'13:00'},ogle:{aktif:true,start:'13:00',end:'17:00'},aksam:{aktif:true,start:'17:00',end:'21:00'}};
+  var bl=b.bloklar;
+  var content=document.getElementById('BAR_HRS_CONTENT');if(!content)return;
+  function blokHtml(key,ad){
+    var x=bl[key];
+    return '<div style="background:var(--s2);border:1px solid var(--b);border-radius:10px;padding:11px;margin-bottom:9px;">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:'+(x.aktif?'10px':'0')+';">'
+      +'<span style="font-size:13px;font-weight:800;color:var(--t2);">'+ad+'</span>'
+      +'<div class="htg '+(x.aktif?'on':'off')+'" onclick="togBlok('+bid+',\''+key+'\')" style="flex-shrink:0;"><div class="htgk"></div></div>'
+      +'</div>'
+      +(x.aktif?'<div style="display:flex;align-items:center;gap:8px;">'
+        +'<input type="time" id="blk-'+key+'-s" value="'+x.start+'" style="flex:1;background:var(--s);border:1px solid var(--b);border-radius:7px;padding:8px;color:var(--t);font-family:Raleway,sans-serif;font-size:14px;font-weight:700;outline:none;text-align:center;">'
+        +'<span style="font-size:14px;color:var(--gr);font-weight:700;">–</span>'
+        +'<input type="time" id="blk-'+key+'-e" value="'+x.end+'" style="flex:1;background:var(--s);border:1px solid var(--b);border-radius:7px;padding:8px;color:var(--t);font-family:Raleway,sans-serif;font-size:14px;font-weight:700;outline:none;text-align:center;">'
+        +'</div>':'<div style="font-size:11px;color:var(--gr2);">Kapalı</div>')
       +'</div>';
-  }).join('');
-
+  }
   content.innerHTML=
-    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">'
-    +'<span style="font-size:12px;font-weight:700;color:var(--t2);">Genel saati geç, özel saat kullan</span>'
-    +'<div class="htg '+(ch.aktif?'on':'off')+'" id="chs-tog" onclick="togCHS('+bid+')" style="flex-shrink:0;"><div class="htgk"></div></div>'
-    +'</div>'
-    +'<div id="chs-fields" style="'+(ch.aktif?'':'opacity:.4;pointer-events:none;')+'">'
-    +'<div class="slbl" style="margin-bottom:8px;">Çalışma Saatleri</div>'
-    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">'
-    +'<input type="time" id="chs-s" value="'+ch.start+'" style="flex:1;background:var(--s2);border:1px solid var(--b);border-radius:7px;padding:8px;color:var(--t);font-family:Raleway,sans-serif;font-size:14px;font-weight:700;outline:none;text-align:center;">'
-    +'<span style="font-size:14px;color:var(--gr);font-weight:700;">–</span>'
-    +'<input type="time" id="chs-e" value="'+ch.end+'" style="flex:1;background:var(--s2);border:1px solid var(--b);border-radius:7px;padding:8px;color:var(--t);font-family:Raleway,sans-serif;font-size:14px;font-weight:700;outline:none;text-align:center;">'
-    +'</div>'
-    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
-    +'<div class="slbl" style="margin-bottom:0;">Mola / Yemek Saatleri</div>'
-    +'<button onclick="brk_add('+bid+')" style="background:rgba(184,146,42,.1);border:1px solid rgba(184,146,42,.3);border-radius:7px;padding:5px 10px;font-family:Raleway,sans-serif;font-size:10px;font-weight:800;color:var(--gd);cursor:pointer;">+ Mola Ekle</button>'
-    +'</div>'
-    +(breaksHtml||'<div style="font-size:11px;color:var(--gr2);margin-bottom:10px;">Henüz mola eklenmedi.</div>')
-    +'</div>'
+    '<div style="font-size:11px;color:var(--gr);margin-bottom:10px;">Her bloğu ayrı açıp kapatabilirsiniz. Sadece açık bloklar randevuda görünür.</div>'
+    +blokHtml('sabah','🌅 Sabah')
+    +blokHtml('ogle','☀️ Öğle')
+    +blokHtml('aksam','🌆 Akşam')
     +'<button class="cta" style="padding:11px;margin-top:4px;" onclick="svBarSaat('+bid+')">Kaydet</button>';
 }
-
-function togCHS(bid){
-  var b=S.barbers.find(function(x){return x.id===bid;});if(!b||!b.cusHrs)return;
-  b.cusHrs.aktif=!b.cusHrs.aktif;rBarSaatForm(bid);
+function togBlok(bid,key){
+  var b=S.barbers.find(function(x){return x.id===bid;});if(!b||!b.bloklar)return;
+  svBarSaatOku(bid);
+  b.bloklar[key].aktif=!b.bloklar[key].aktif;
+  rBarSaatForm(bid);
 }
-
+function svBarSaatOku(bid){
+  var b=S.barbers.find(function(x){return x.id===bid;});if(!b||!b.bloklar)return;
+  ['sabah','ogle','aksam'].forEach(function(key){
+    var s=document.getElementById('blk-'+key+'-s');var e=document.getElementById('blk-'+key+'-e');
+    if(s)b.bloklar[key].start=s.value;if(e)b.bloklar[key].end=e.value;
+  });
+}
 function brk_add(bid){
   var b=S.barbers.find(function(x){return x.id===bid;});if(!b||!b.cusHrs)return;
   b.cusHrs.breaks.push({s:'12:00',e:'13:00'});rBarSaatForm(bid);
@@ -919,17 +925,10 @@ function brk_del(bid,idx){
 }
 
 function svBarSaat(bid){
-  var b=S.barbers.find(function(x){return x.id===bid;});if(!b||!b.cusHrs)return;
-  var s=document.getElementById('chs-s');var e=document.getElementById('chs-e');
-  if(s)b.cusHrs.start=s.value;
-  if(e)b.cusHrs.end=e.value;
-  // Mola saatlerini kaydet
-  b.cusHrs.breaks.forEach(function(br,i){
-    var bs=document.getElementById('brk-s-'+i);var be=document.getElementById('brk-e-'+i);
-    if(bs)br.s=bs.value;if(be)br.e=be.value;
-  });
+  var b=S.barbers.find(function(x){return x.id===bid;});if(!b||!b.bloklar)return;
+  svBarSaatOku(bid);
   save();rBars();rTG();
-  toast('Kaydedildi',b.name+' özel saatleri güncellendi','ok');
+  toast('Kaydedildi',b.name+' çalışma saatleri güncellendi','ok');
 }
 function addBar(){var n=document.getElementById('NBN').value.trim();var r=document.getElementById('NBR').value.trim()||'Berber';if(!n){toast('Hata','Ad giriniz.','err');return;}var ini=n.split(' ').map(function(w){return w[0];}).join('').substring(0,2).toUpperCase();var nid=S.barbers.length?Math.max.apply(null,S.barbers.map(function(x){return x.id;}))+1:1;S.barbers.push({id:nid,name:n,role:r,ini:ini,yuzde:40,cusHrs:{aktif:false,start:'09:00',end:'19:00',breaks:[]}});document.getElementById('NBN').value='';document.getElementById('NBR').value='';save();rBars();rBL();rASt();rBCSR();toast('Eklendi',n,'ok');}
 function edBar(id){var b=S.barbers.find(function(x){return x.id===id;});if(!b)return;showM({tit:'Berber Düzenle',sub:b.name,body:'<div class="fld" style="margin-bottom:7px"><label>Ad</label><input type="text" id="ebn" value="'+b.name+'" style="'+IS()+'"></div><div class="fld" style="margin-bottom:7px"><label>Unvan</label><input type="text" id="ebr" value="'+b.role+'" style="'+IS()+'"></div><div class="fld"><label>Hakediş Yüzdesi (%)</label><input type="number" id="ebyuzde" value="'+(b.yuzde||40)+'" min="0" max="100" style="'+IS()+'"></div>',ctx:'Kaydet',oc:'cEdBar('+id+')',ct:'İptal'});}
