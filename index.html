@@ -701,7 +701,7 @@ function fmtP(el){var v=el.value.replace(/\D/g,'');if(v.length>11)v=v.substring(
 function initR(){rBL();rCF();rSvc();onSvc();var de=document.getElementById('RD');if(!de.value)de.value=TODAY;rTG();chkCB();filF();}
 function filF(){if(!S.user)return;var rn=document.getElementById('rn');var rp=document.getElementById('rp');if(rn&&!rn.value)rn.value=S.user.name;if(rp&&!rp.value)rp.value=S.user.phone;}
 function chkCB(){var d=document.getElementById('RD').value||TODAY;var b=document.getElementById('CBAN');if(b)b.style.display=isHol(d)?'block':'none';}
-function rCF(){var el=document.getElementById('CF');if(!el)return;var cs=['Tümü','Saç','Sakal','Cilt','Kombo','Diğer'];el.innerHTML=cs.map(function(c){return'<div class="cb'+(S.cat===c?' active':'')+'" onclick="selCat(\''+c+'\')">'+c+'</div>';}).join('');}
+function rCF(){var el=document.getElementById('CF');if(!el)return;var cs=['Tümü','Saç','Sakal','Cilt'];el.innerHTML=cs.map(function(c){return'<div class="cb'+(S.cat===c?' active':'')+'" onclick="selCat(\''+c+'\')">'+c+'</div>';}).join('');}
 function selCat(c){S.cat=c;rCF();rSvc();}
 function rSvc(){var sel=document.getElementById('RS');if(!sel)return;var sv=S.cat==='Tümü'?S.svcs:S.svcs.filter(function(s){return s.cat===S.cat;});sel.innerHTML=sv.map(function(s){return'<option value="'+s.id+'">'+s.name+' · '+s.price+'₺ · '+s.dur+' dk</option>';}).join('');if(!sel.options.length)sel.innerHTML='<option>Hizmet yok</option>';}
 function onSvc(){var sel=document.getElementById('RS');var bar=document.getElementById('SIH');if(!sel||!bar)return;var sv=S.svcs.find(function(s){return s.id===parseInt(sel.value);});if(sv){bar.style.display='block';bar.textContent='⏱ '+sv.dur+' dk · 💰 '+sv.price+'₺';rTG();}else bar.style.display='none';}
