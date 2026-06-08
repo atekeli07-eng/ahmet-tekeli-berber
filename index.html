@@ -1435,18 +1435,14 @@ function fbSet(path,data){return fetch(FB+path+'.json',{method:'PUT',headers:{'C
 function fbDel(path){return fetch(FB+path+'.json',{method:'DELETE'}).catch(function(e){console.warn('fbDel:',e);});}
 
 function fbSave(){
-  var apptObj={};S.appts.forEach(function(a){apptObj[a.id]=a;});
-  // randevular toptan yazilmiyor (tekil yazma subR'da)
-  var custObj={};S.custs.forEach(function(c){custObj[c.id]=c;});
-  fbSet('/custs', S.custs.length ? custObj : null);
-  // Config — barbers yuzde dahil her şey
-  fbSet('/config',{barbers:S.barbers,svcs:S.svcs,wh:S.wh,hols:S.hols,waP:S.waP||''});
-  // Stok — boş olsa bile yaz
-  var stkObj={};S.stok.forEach(function(s){stkObj[s.id]=s;});
-  fbSet('/stok', S.stok.length ? stkObj : null);
-  // Kasa — boş olsa bile yaz (silme işlemlerinin yansıması için)
-  var ksObj={};S.kasa.forEach(function(k){ksObj[k.id]=k;});
-  fbSet('/kasa', S.kasa.length ? ksObj : null);
+  // Müşteriler — sadece liste DOLUYSA yaz (boş liste Firebase'i ezmesin)
+  if(S.custs&&S.custs.length){var custObj={};S.custs.forEach(function(c){custObj[c.id]=c;});fbSet('/custs',custObj);}
+  // Config (saatler, berberler) — sadece berber varsa yaz
+  if(S.barbers&&S.barbers.length){fbSet('/config',{barbers:S.barbers,svcs:S.svcs,wh:S.wh,hols:S.hols,waP:S.waP||''});}
+  // Stok — sadece doluysa
+  if(S.stok&&S.stok.length){var stkObj={};S.stok.forEach(function(s){stkObj[s.id]=s;});fbSet('/stok',stkObj);}
+  // Kasa — sadece doluysa
+  if(S.kasa&&S.kasa.length){var ksObj={};S.kasa.forEach(function(k){ksObj[k.id]=k;});fbSet('/kasa',ksObj);}
 }
 
 function fbLoad(cb){
@@ -1682,61 +1678,35 @@ save = function(){
 };
 
 function pollFirebase(){
-  if(_benimDegisiklik) return;  // Ben değiştiriyorsam atla
-
-  Promise.all([
-    fbGet('/appts'),
-    fbGet('/config'),
-    fbGet('/custs'),
-    fbGet('/kasa'),
-    fbGet('/stok')
-  ]).then(function(res){
-    if(_benimDegisiklik) return;  // Fetch sırasında ben değiştirdim, uygulama
-
-    var apptData = res[0];
-    var cfgData  = res[1];
-    var custData = res[2];
-    var kasaData = res[3];
-    var stokData = res[4];
-
-    var changed = false;
-
-    // Randevular değişti mi?
-    var newApptHash = hashObj(apptData);
-    if(newApptHash !== _lastApptHash){
-      if(apptData && typeof apptData === 'object'){
-        var yeniAppts = Object.values(apptData);
-        yeniAppts.forEach(function(a){
-          if(!a.ro)a.ro='none';
-          if(a.bid)a.bid=parseInt(a.bid)||a.bid;
-          if(a.sid)a.sid=parseInt(a.sid)||a.sid;
-        });
-        // Yeni randevu bildirimi
-        var adminOpen = document.getElementById('APV')&&document.getElementById('APV').style.display!=='none';
-        if(adminOpen){
-          var mevcutIds = S.appts.map(function(a){return a.id;});
-          var yeni = yeniAppts.filter(function(a){
-            return mevcutIds.indexOf(a.id)===-1&&(a.st==='confirmed'||a.st==='pending');
-          });
-          yeni.forEach(function(a){
-            var sv=S.svcs.find(function(s){return s.id===a.sid;})||{name:'?'};
-            var b=S.barbers.find(function(x){return x.id===a.bid;})||{name:'?'};
-            addAN({ic:'🔔',tit:'YENİ RANDEVU: '+a.name,txt:sv.name+' · '+fmtD(a.date)+' '+a.time+' · '+b.name});
-            toast('🔔 Yeni Randevu!',a.name+' · '+sv.name+' · '+a.time,'bel',8000);
-          });
+  if(_benimDegisiklik) return;
+  Promise.all([fbGet('/appts'),fbGet('/config'),fbGet('/custs'),fbGet('/kasa'),fbGet('/stok')]).then(function(res){
+    if(_benimDegisiklik) return;
+    var apptData=res[0],cfgData=res[1],custData=res[2],kasaData=res[3],stokData=res[4];
+    var changed=false;
+    // Randevular — SADECE dolu veri gelirse güncelle (boş/eksik veri yerel randevuları silmesin)
+    var newApptHash=hashObj(apptData);
+    if(newApptHash!==_lastApptHash){
+      if(apptData&&typeof apptData==='object'){
+        var yeniAppts=Object.values(apptData);
+        if(yeniAppts.length>0){
+          yeniAppts.forEach(function(a){if(!a.ro)a.ro='none';if(a.bid)a.bid=parseInt(a.bid)||a.bid;if(a.sid)a.sid=parseInt(a.sid)||a.sid;});
+          var adminOpen=document.getElementById('APV')&&document.getElementById('APV').style.display!=='none';
+          if(adminOpen){
+            var mevcutIds=S.appts.map(function(a){return a.id;});
+            var yeni=yeniAppts.filter(function(a){return mevcutIds.indexOf(a.id)===-1&&(a.st==='confirmed'||a.st==='pending');});
+            yeni.forEach(function(a){var sv=S.svcs.find(function(s){return s.id===a.sid;})||{name:'?'};var b=S.barbers.find(function(x){return x.id===a.bid;})||{name:'?'};addAN({ic:'🔔',tit:'YENİ RANDEVU: '+a.name,txt:sv.name+' · '+fmtD(a.date)+' '+a.time+' · '+b.name});toast('🔔 Yeni Randevu!',a.name+' · '+sv.name+' · '+a.time,'bel',8000);});
+          }
+          S.appts=yeniAppts;changed=true;
         }
-        S.appts = yeniAppts;
-        changed = true;
       }
     }
-    if(newApptHash) _lastApptHash = newApptHash;
-
-    // Config değişti mi?
-    var newCfgHash = hashObj(cfgData);
-    if(newCfgHash !== _lastConfigHash){
-      if(cfgData && typeof cfgData === 'object'){
+    if(newApptHash)_lastApptHash=newApptHash;
+    // Config — berberlerin gunler2 ve cusHrs ayarları KORUNUR
+    var newCfgHash=hashObj(cfgData);
+    if(newCfgHash!==_lastConfigHash){
+      if(cfgData&&typeof cfgData==='object'){
         if(cfgData.barbers&&cfgData.barbers.length){
-          S.barbers = cfgData.barbers.map(function(b){
+          S.barbers=cfgData.barbers.map(function(b){
             if(!b.cusHrs)b.cusHrs={aktif:false,start:'09:00',end:'19:00',breaks:[]};
             b.yuzde=(b.yuzde!==undefined)?parseInt(b.yuzde):40;
             return b;
@@ -1746,53 +1716,43 @@ function pollFirebase(){
         if(cfgData.wh)S.wh=cfgData.wh;
         if(cfgData.hols)S.hols=cfgData.hols;
         if(cfgData.waP!==undefined)S.waP=cfgData.waP;
-        changed = true;
+        changed=true;
       }
     }
-    if(newCfgHash) _lastConfigHash = newCfgHash;
-
-    // Müşteriler
-    if(custData && typeof custData === 'object'){
-      var newCusts = Object.values(custData);
-      if(newCusts.length !== S.custs.length) S.custs = newCusts;
+    if(newCfgHash)_lastConfigHash=newCfgHash;
+    // Müşteriler — SADECE dolu veri gelirse güncelle (boş veri kayıtları silmesin)
+    if(custData&&typeof custData==='object'){
+      var newCusts=Object.values(custData);
+      if(newCusts.length>0){
+        var custHash=JSON.stringify(newCusts.map(function(c){return c.id;}).sort());
+        var mevcutCustHash=JSON.stringify(S.custs.map(function(c){return c.id;}).sort());
+        if(custHash!==mevcutCustHash){S.custs=newCusts;changed=true;}
+      }
     }
-
     // Kasa
-    if(kasaData && typeof kasaData === 'object'){
-      var newKasa = Object.values(kasaData);
-      var kasaHash = JSON.stringify(newKasa.map(function(k){return k.id;}).sort());
-      var mevcutKasaHash = JSON.stringify(S.kasa.map(function(k){return k.id;}).sort());
-      if(kasaHash !== mevcutKasaHash){ S.kasa = newKasa; changed = true; }
-    } else if(kasaData === null && S.kasa.length > 0){
-      S.kasa = []; changed = true;
+    if(kasaData&&typeof kasaData==='object'){
+      var newKasa=Object.values(kasaData);
+      var kasaHash=JSON.stringify(newKasa.map(function(k){return k.id;}).sort());
+      var mevcutKasaHash=JSON.stringify(S.kasa.map(function(k){return k.id;}).sort());
+      if(kasaHash!==mevcutKasaHash){S.kasa=newKasa;changed=true;}
     }
-
     // Stok
-    if(stokData && typeof stokData === 'object'){
-      var newStok = Object.values(stokData);
-      var stokHash = JSON.stringify(newStok.map(function(s){return s.id+s.miktar;}).sort());
-      var mevcutStokHash = JSON.stringify(S.stok.map(function(s){return s.id+s.miktar;}).sort());
-      if(stokHash !== mevcutStokHash){ S.stok = newStok; changed = true; }
-    } else if(stokData === null && S.stok.length > 0){
-      S.stok = []; changed = true;
+    if(stokData&&typeof stokData==='object'){
+      var newStok=Object.values(stokData);
+      var stokHash=JSON.stringify(newStok.map(function(s){return s.id+s.miktar;}).sort());
+      var mevcutStokHash=JSON.stringify(S.stok.map(function(s){return s.id+s.miktar;}).sort());
+      if(stokHash!==mevcutStokHash){S.stok=newStok;changed=true;}
     }
-
     if(changed){
-      clnPast();
-      rTG();
-      var adminOpen2 = document.getElementById('APV')&&document.getElementById('APV').style.display!=='none';
-      if(adminOpen2){
-        rAll();
-        // Çalışanlar sekmesi açıksa güncelle
-        var calEl = document.getElementById('at-calisanlar');
-        if(calEl&&calEl.style.display!=='none') rCalisanlar();
-      }
-      var musteriOpen = document.getElementById('MLG')&&document.getElementById('MLG').style.display!=='none';
-      if(musteriOpen&&S.user) rMP();
+      clnPast();rTG();
+      var adminOpen2=document.getElementById('APV')&&document.getElementById('APV').style.display!=='none';
+      if(adminOpen2){rAll();var calEl=document.getElementById('at-calisanlar');if(calEl&&calEl.style.display!=='none')rCalisanlar();}
+      var musteriOpen=document.getElementById('MLG')&&document.getElementById('MLG').style.display!=='none';
+      if(musteriOpen&&S.user)rMP();
     }
-
-  }).catch(function(e){ console.warn('Poll hatası:', e); });
+  }).catch(function(e){console.warn('Poll hatası:',e);});
 }
+
 
 function baslatPolling(){
   if(_pollTimer) return;
