@@ -654,7 +654,7 @@ function swP(n){document.querySelectorAll('.pnl').forEach(function(p){p.classLis
 // Helpers
 function fmtD(d){if(!d)return'';var p=d.split('-');return parseInt(p[2])+' '+MT[parseInt(p[1])]+' '+p[0];}
 function t2m(t){var p=t.split(':');return parseInt(p[0])*60+parseInt(p[1]);}
-function isHol(ds){if(S.hols.includes(ds))return true;var dow=new Date(ds+'T00:00:00').getDay();return!S.wh[dow].o;}
+function isHol(ds){return S.hols.includes(ds);}
 function opSl(ds,bid){
   if(isHol(ds))return[];
   var dow=new Date(ds+'T00:00:00').getDay();
