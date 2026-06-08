@@ -723,13 +723,9 @@ function subR(){
   if(!S.selT){toast('Hata','Saat seçiniz.','err');return;}
   var sv=S.svcs.find(function(s){return s.id===sid;});
   if(!sv){toast('Hata','Hizmet seçiniz.','err');return;}
-  var cf=hasCf(S.selB,date,S.selT,sv.dur,null);
-  if(cf){toast('Çakışma!',cf.name+"'ın randevusuyla çakışıyor.",'err',5000);return;}
   var uid=S.user?S.user.id:null;
-  var apt={id:'a'+Date.now(),name:name,phone:phone,bid:S.selB,sid:sid,date:date,time:S.selT,st:'confirmed',uid:uid,ro:S.selRO};
-  S.appts.push(apt);save();
- var apt={id:'a'+Date.now(),name:name,phone:phone,bid:S.selB,sid:sid,date:date,time:S.selT,st:'confirmed',uid:uid,ro:S.selRO};
   var selB=S.selB,selT2=S.selT,selDur=sv.dur;
+  var apt={id:'a'+Date.now(),name:name,phone:phone,bid:selB,sid:sid,date:date,time:selT2,st:'confirmed',uid:uid,ro:S.selRO};
   fbGet('/appts').then(function(fresh){
     if(fresh&&typeof fresh==='object'){
       var freshList=Object.values(fresh);
