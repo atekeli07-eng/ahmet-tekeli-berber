@@ -1690,8 +1690,10 @@ function pollFirebase(){
             var yeni=yeniAppts.filter(function(a){return mevcutIds.indexOf(a.id)===-1&&(a.st==='confirmed'||a.st==='pending');});
             yeni.forEach(function(a){var sv=S.svcs.find(function(s){return s.id===a.sid;})||{name:'?'};var b=S.barbers.find(function(x){return x.id===a.bid;})||{name:'?'};addAN({ic:'🔔',tit:'YENİ RANDEVU: '+a.name,txt:sv.name+' · '+fmtD(a.date)+' '+a.time+' · '+b.name});toast('🔔 Yeni Randevu!',a.name+' · '+sv.name+' · '+a.time,'bel',8000);});
           }
-          S.appts=yeniAppts;changed=true;
-        }
+var birlesmis={};
+          S.appts.forEach(function(a){birlesmis[a.id]=a;});
+          yeniAppts.forEach(function(a){birlesmis[a.id]=a;});
+          S.appts=Object.values(birlesmis);changed=true;        }
       }
     }
     if(newApptHash)_lastApptHash=newApptHash;
